@@ -83,6 +83,13 @@ a {
   padding-bottom: 18px;
 }
 
+.intro-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
 .eyebrow {
   color: var(--berry);
   font-size: 13px;

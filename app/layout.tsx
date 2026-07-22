@@ -14,8 +14,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <a href="/" className="brand" aria-label="Houvast Maaltijden">
             Houvast Maaltijden
           </a>
-          <a href="/admin" className="admin-link">
-            Admin
+          <a href="/aanmelden" className="admin-link">
+            Aanmeldpagina
           </a>
         </header>
         <main>{children}</main>

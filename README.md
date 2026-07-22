@@ -15,7 +15,7 @@ Een simpele maaltijd-randomizer voor contact binnen de kerkgemeenschap.
 
 ## Simpele flow
 
-1. Deelnemer vult het formulier op `/` in.
+1. Deelnemer vult het formulier op `/aanmelden` in.
 2. Admin of automatische job maakt een maandronde.
 3. Host krijgt een mail met een unieke link.
 4. Host kiest mogelijke dagen en kan invullen wat hij ongeveer kookt.
@@ -98,7 +98,13 @@ Als `AUTO_SEND_ROUNDS=true` verstuurt de job ook automatisch host-mails voor nie
 Open:
 
 ```text
-/admin
+/
 ```
 
 Gebruik de waarde van `ADMIN_TOKEN`.
+
+De publieke aanmeldpagina staat op:
+
+```text
+/aanmelden
+```

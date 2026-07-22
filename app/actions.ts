@@ -74,7 +74,7 @@ function requireAdmin(formData: FormData) {
 }
 
 function redirectAdmin(key: string, notice: string) {
-  redirect(`/admin?key=${encodeURIComponent(key)}&notice=${encodeURIComponent(notice)}`);
+  redirect(`/?key=${encodeURIComponent(key)}&notice=${encodeURIComponent(notice)}`);
 }
 
 function databaseUnavailableNotice(error: unknown) {
@@ -86,11 +86,11 @@ export async function registerParticipant(formData: FormData) {
   const data = participantFormData(formData, true);
 
   if (!data.name || !data.email || !data.whatsapp) {
-    redirect("/?error=missing");
+    redirect("/aanmelden?error=missing");
   }
 
   if (data.mode !== ParticipationMode.EAT && !data.address) {
-    redirect("/?error=address");
+    redirect("/aanmelden?error=address");
   }
 
   const participant = await prisma.participant.upsert({

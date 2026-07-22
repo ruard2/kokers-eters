@@ -63,7 +63,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
         <section className="panel centered">
           <p className="eyebrow">Admin</p>
           <h1>Admin openen</h1>
-          <form className="stack" action="/admin">
+          <form className="stack" action="/">
             <label>
               Admin-sleutel
               <input name="key" type="password" />
@@ -109,6 +109,11 @@ export default async function AdminPage({ searchParams }: PageProps) {
         <p className="eyebrow">Admin</p>
         <h1>Rondes en matches</h1>
         <p>Maak rondes, verstuur host-mails en controleer wat de randomizer heeft gedaan.</p>
+        <div className="intro-actions">
+          <a className="button secondary" href="/aanmelden">
+            Deel aanmeldpagina
+          </a>
+        </div>
       </section>
 
       {notice ? <div className="notice success">{notice}</div> : null}
