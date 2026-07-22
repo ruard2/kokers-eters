@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: houvast-demo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: houvast
+      POSTGRES_PASSWORD: houvast
+      POSTGRES_DB: houvast
+    ports:
+      - "5437:5432"
+    volumes:
+      - houvast-demo-db:/var/lib/postgresql/data
+
+volumes:
+  houvast-demo-db:

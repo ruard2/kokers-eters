@@ -1,0 +1,5 @@
+ALTER TYPE "CommunityScope" ADD VALUE IF NOT EXISTS 'BOTH';
+ALTER TYPE "GatheringType" ADD VALUE IF NOT EXISTS 'BOTH';
+
+ALTER TABLE "Participant" ALTER COLUMN "communityScope" SET DEFAULT 'BOTH';
+ALTER TABLE "Participant" ALTER COLUMN "gatheringType" SET DEFAULT 'BOTH';

@@ -1,0 +1,34 @@
+{
+  "name": "houvast-maaltijd-randomizer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "prisma migrate deploy && next start",
+    "db:push": "prisma db push",
+    "prisma:generate": "prisma generate",
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "jobs:run": "tsx scripts/run-jobs.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "next": "16.2.11",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "resend": "6.18.0",
+    "zod": "4.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.0.15",
+    "@types/react": "19.0.8",
+    "@types/react-dom": "19.0.3",
+    "prisma": "6.19.3",
+    "tsx": "4.20.6",
+    "typescript": "5.8.3"
+  },
+  "overrides": {
+    "postcss": "8.5.22",
+    "sharp": "0.35.3"
+  }
+}
