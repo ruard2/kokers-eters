@@ -5,7 +5,7 @@
     "buildCommand": "npm ci && npm run build"
   },
   "deploy": {
-    "preDeployCommand": "npm run migrate:deploy",
+    "preDeployCommand": "node scripts/migrate-deploy-optional.mjs",
     "startCommand": "npm run start",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 300,

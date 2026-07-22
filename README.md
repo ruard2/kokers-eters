@@ -58,7 +58,7 @@ APP_URL="http://127.0.0.1:3000"
 Koppel de GitHub-repo aan Railway en voeg een PostgreSQL database toe. Deze repo bevat `railway.json`, dus Railway krijgt automatisch:
 
 - build command: `npm ci && npm run build`
-- pre-deploy command: `npm run migrate:deploy`
+- pre-deploy command: `node scripts/migrate-deploy-optional.mjs`
 - start command: `npm run start`
 - healthcheck: `/api/health`
 
@@ -72,10 +72,11 @@ Zet daarna deze variabelen op de app-service:
 - `EMAIL_FROM`
 - `AUTO_GENERATE_ROUNDS`
 - `AUTO_SEND_ROUNDS`
+- optioneel: `REQUIRE_DATABASE_MIGRATIONS`
 
 Gebruik de `DATABASE_URL` van Railway PostgreSQL. `APP_URL` moet de publieke Railway URL van de app zijn, bijvoorbeeld `https://kokers-eters-production.up.railway.app`.
 
-De database-migraties draaien in Railway via de pre-deploy stap. De app start daarna met Next.js op de door Railway gegeven `PORT`.
+De database-migraties draaien in Railway via de pre-deploy stap als `DATABASE_URL` goed staat. Als de database nog niet bereikbaar is, start de app alsnog met de demo/fallback adminweergave. Zet `REQUIRE_DATABASE_MIGRATIONS=true` als een deploy juist moet falen wanneer migraties niet lukken.
 
 ## Automatische jobs
 
