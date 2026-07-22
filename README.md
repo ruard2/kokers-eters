@@ -55,7 +55,14 @@ APP_URL="http://127.0.0.1:3000"
 
 ## Railway
 
-Koppel de GitHub-repo aan Railway en voeg een PostgreSQL database toe. Zet daarna deze variabelen:
+Koppel de GitHub-repo aan Railway en voeg een PostgreSQL database toe. Deze repo bevat `railway.json`, dus Railway krijgt automatisch:
+
+- build command: `npm ci && npm run build`
+- pre-deploy command: `npm run migrate:deploy`
+- start command: `npm run start`
+- healthcheck: `/api/health`
+
+Zet daarna deze variabelen op de app-service:
 
 - `DATABASE_URL`
 - `APP_URL`
@@ -66,19 +73,9 @@ Koppel de GitHub-repo aan Railway en voeg een PostgreSQL database toe. Zet daarn
 - `AUTO_GENERATE_ROUNDS`
 - `AUTO_SEND_ROUNDS`
 
-Build command:
+Gebruik de `DATABASE_URL` van Railway PostgreSQL. `APP_URL` moet de publieke Railway URL van de app zijn, bijvoorbeeld `https://kokers-eters-production.up.railway.app`.
 
-```bash
-npm run build
-```
-
-Start command:
-
-```bash
-npm start
-```
-
-`npm start` draait eerst Prisma migrations en start daarna Next.js.
+De database-migraties draaien in Railway via de pre-deploy stap. De app start daarna met Next.js op de door Railway gegeven `PORT`.
 
 ## Automatische jobs
 

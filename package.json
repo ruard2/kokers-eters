@@ -2,10 +2,15 @@
   "name": "houvast-maaltijd-randomizer",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22 <25",
+    "npm": ">=10"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "start": "prisma migrate deploy && next start",
+    "start": "next start --hostname 0.0.0.0",
+    "migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "prisma:generate": "prisma generate",
     "seed:demo": "tsx scripts/seed-demo.ts",
