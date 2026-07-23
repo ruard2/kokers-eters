@@ -4,6 +4,7 @@ import {
   cancelMatchAction,
   clearDemoAction,
   generatePlanningAction,
+  reopenRoundAction,
   seedDemoAction,
   saveAdminParticipantAction,
   saveMailTemplateAction,
@@ -518,6 +519,7 @@ function RoundsAccordion({
                 <strong>{displayMonth(round.month)}</strong>
                 <small>
                   {statusLabel(round.status)} - {matchCount} verbinding(en)
+                  {draftCount > 0 ? ` - ${draftCount} concept` : ""}
                 </small>
               </span>
             </summary>
@@ -528,22 +530,24 @@ function RoundsAccordion({
                     <div>
                       <h3>Matches controleren en goedkeuren</h3>
                       <p>
-                        De matches zijn automatisch gegenereerd. Sleep blokjes om handmatig aan te passen. Groen betekent
-                        dat capaciteit, rol, vorm en admin-blokkades kloppen. Permanente blokkades zet je in de sheet bij{" "}
-                        <strong>Niet met</strong>.
+                        De matches zijn automatisch gegenereerd. Klik een persoon aan en klik daarna een andere
+                        verbinding om te wisselen, of sleep blokjes. Groen betekent dat capaciteit, rol, vorm en
+                        admin-blokkades kloppen. Permanente blokkades zet je in de sheet bij <strong>Niet met</strong>.
                       </p>
                     </div>
                     <div className="inline-actions">
                       <a className="button secondary" href={adminHref(adminKey, { step: "planning", sheet: "1" })}>
                         Sheet met aanmeldingen
                       </a>
-                      <form action={sendHostInvitesAction}>
-                        <input type="hidden" name="adminKey" value={adminKey} />
-                        <input type="hidden" name="roundId" value={round.id} />
-                        <button disabled={usingDemoData || draftCount === 0} type="submit">
-                          Goedkeuren + host-mails
-                        </button>
-                      </form>
+                      {round.status !== "DRAFT" ? (
+                        <form action={reopenRoundAction}>
+                          <input type="hidden" name="adminKey" value={adminKey} />
+                          <input type="hidden" name="roundId" value={round.id} />
+                          <button className="secondary" disabled={usingDemoData} type="submit">
+                            Zet terug naar concept
+                          </button>
+                        </form>
+                      ) : null}
                     </div>
                   </div>
                   <AdminMatchBoard
@@ -636,6 +640,53 @@ function EmailLogsTable({ emailLogs }: { emailLogs: EmailLog[] }) {
           ) : null}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function RoundMailActions({
+  adminKey,
+  matches,
+  rounds,
+  usingDemoData
+}: {
+  adminKey: string;
+  matches: MatchWithPeople[];
+  rounds: RoundWithMatches[];
+  usingDemoData: boolean;
+}) {
+  const draftCounts = new Map<string, number>();
+  for (const match of matches) {
+    if (match.status === "DRAFT") {
+      draftCounts.set(match.roundId, (draftCounts.get(match.roundId) || 0) + 1);
+    }
+  }
+
+  const orderedRounds = [...rounds].sort((a, b) => a.month.getTime() - b.month.getTime());
+
+  return (
+    <div className="mail-round-list">
+      {orderedRounds.map((round) => {
+        const draftCount = draftCounts.get(round.id) || 0;
+        return (
+          <div className="mail-round-row" key={round.id}>
+            <div>
+              <strong>{displayMonth(round.month)}</strong>
+              <small>
+                {statusLabel(round.status)} - {draftCount} conceptmatch(es) klaar voor host-mail
+              </small>
+            </div>
+            <form action={sendHostInvitesAction}>
+              <input type="hidden" name="adminKey" value={adminKey} />
+              <input type="hidden" name="roundId" value={round.id} />
+              <button className="small" disabled={usingDemoData || draftCount === 0} type="submit">
+                Host-mails sturen
+              </button>
+            </form>
+          </div>
+        );
+      })}
+      {orderedRounds.length === 0 ? <div className="board-empty">Nog geen rondes om te mailen.</div> : null}
     </div>
   );
 }
@@ -771,13 +822,17 @@ function StepFour({
   adminKey,
   defaultMonth,
   emailLogs,
+  matches,
   mailTemplates,
+  rounds,
   usingDemoData
 }: {
   adminKey: string;
   defaultMonth: string;
   emailLogs: EmailLog[];
+  matches: MatchWithPeople[];
   mailTemplates: MailTemplate[];
+  rounds: RoundWithMatches[];
   usingDemoData: boolean;
 }) {
   const savedTemplates = new Map(mailTemplates.map((template) => [template.type, template]));
@@ -801,6 +856,13 @@ function StepFour({
           Meedoen-check nu sturen
         </button>
       </form>
+      <div className="nested-panel">
+        <div className="section-header">
+          <h2>Host-mails per ronde</h2>
+          <span className="section-hint">Stuur pas als de matches in stap 2 goed staan.</span>
+        </div>
+        <RoundMailActions adminKey={adminKey} matches={matches} rounds={rounds} usingDemoData={usingDemoData} />
+      </div>
       <div className="mail-template-list">
         {adminMailTemplateDefinitions.map((definition) => {
           const saved = savedTemplates.get(definition.type);
@@ -918,7 +980,7 @@ function StepFive({
             <input type="hidden" name="adminKey" value={adminKey} />
             <input type="hidden" name="roundId" value={reviewRound.id} />
             <button disabled={usingDemoData || draftReviewMatches.length === 0} type="submit">
-              Goedkeuren + host-mails
+              Host-mails sturen
             </button>
           </form>
         ) : null}
@@ -1114,7 +1176,9 @@ export default async function AdminPage({ searchParams }: PageProps) {
           adminKey={key}
           defaultMonth={defaultMonth}
           emailLogs={emailLogs}
+          matches={matches}
           mailTemplates={mailTemplates}
+          rounds={rounds}
           usingDemoData={usingDemoData}
         />
       ) : null}

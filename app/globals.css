@@ -784,6 +784,33 @@ th {
   line-height: 1.4;
 }
 
+.mail-round-list {
+  display: grid;
+  gap: 8px;
+}
+
+.mail-round-row {
+  align-items: center;
+  background: #fbfcfa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.mail-round-row strong,
+.mail-round-row small {
+  display: block;
+}
+
+.mail-round-row small {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
 .mail-template-list {
   display: grid;
   gap: 10px;
@@ -1141,6 +1168,13 @@ th {
   margin: 0;
 }
 
+.board-help {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .board-empty {
   border: 1px dashed var(--line);
   border-radius: 8px;
@@ -1403,7 +1437,8 @@ th {
   }
 
   .admin-topline,
-  .approval-panel {
+  .approval-panel,
+  .mail-round-row {
     display: grid;
   }
 

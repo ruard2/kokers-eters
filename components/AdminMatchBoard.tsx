@@ -278,7 +278,7 @@ function validationFor(
 
 function parseDragPayload(event: React.DragEvent) {
   try {
-    const raw = event.dataTransfer.getData("application/json");
+    const raw = event.dataTransfer.getData("application/json") || event.dataTransfer.getData("text/plain");
     const parsed = JSON.parse(raw) as Partial<DragPayload>;
     if ((parsed.side === "host" || parsed.side === "eater") && typeof parsed.matchId === "string") {
       return parsed as DragPayload;
@@ -369,6 +369,7 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
     () => (selected ? matches.filter((match) => validations.get(match.id)?.ok).length : 0),
     [matches, selected, validations]
   );
+  const editableCount = matches.filter((match) => !disabled && match.status === "DRAFT").length;
 
   async function commitSwap(payload: DragPayload, targetMatchId: string) {
     const validation = validateMove(matches, payload, targetMatchId, adminNoMatch);
@@ -432,6 +433,7 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
   function handleDragStart(event: React.DragEvent, payload: DragPayload) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("application/json", JSON.stringify(payload));
+    event.dataTransfer.setData("text/plain", JSON.stringify(payload));
     setError(null);
     setMessage(null);
     setSelected(payload);
@@ -461,7 +463,7 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
         <div className="board-toolbar">
           <div className="board-summary">
             <strong>{matches.length} verbindingen</strong>
-            {selected ? <span>{viableCount} mogelijke ruilen</span> : <span>Conceptbord</span>}
+            {selected ? <span>{viableCount} mogelijke ruilen</span> : <span>{editableCount} aanpasbaar</span>}
           </div>
           <div className="board-actions">
             {selected ? (
@@ -477,6 +479,15 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
 
         {message ? <div className="notice success board-notice">{message}</div> : null}
         {error ? <div className="notice error board-notice">{error}</div> : null}
+        {editableCount > 0 ? (
+          <div className="board-help">
+            Klik een host of eter aan en klik daarna een andere verbinding om te wisselen. Slepen kan ook.
+          </div>
+        ) : (
+          <div className="notice board-notice">
+            Deze ronde is niet meer aanpasbaar. Zet hem terug naar concept als er nog geen echte mails zijn verstuurd.
+          </div>
+        )}
         {hiddenCount > 0 ? <div className="notice board-notice">{hiddenCount} niet-passende verbindingen verborgen.</div> : null}
 
         <div className={`match-board ${busy ? "busy" : ""} ${selected ? "checking" : ""} ${fullscreen ? "simple" : ""}`}>
@@ -497,8 +508,9 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
                 className={`match-row ${editable ? "editable" : "locked"} ${dropClass}`}
                 key={match.id}
                 onDragOver={(event) => {
-                  if (editable && validation?.ok) {
+                  if (editable && selected) {
                     event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
                   }
                 }}
                 onDrop={(event) => handleDrop(event, match.id)}

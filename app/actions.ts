@@ -1,6 +1,6 @@
 "use server";
 
-import { CommunityScope, Frequency, GatheringType, MatchStatus, ParticipationMode } from "@prisma/client";
+import { CommunityScope, Frequency, GatheringType, MatchStatus, ParticipationMode, Prisma, RoundStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { demoSeedEnabled, isAdminKey } from "@/lib/admin";
 import { runDueJobs, sendHostInvitesForRound, sendPreferenceChecksForMonth } from "@/lib/automation";
@@ -348,10 +348,77 @@ export async function sendHostInvitesAction(formData: FormData) {
   const roundId = text(formData, "roundId") || undefined;
   try {
     const sent = await sendHostInvitesForRound(roundId);
-    redirectAdmin(key, `${sent} host-mails verstuurd.`, { step: "mails" });
+    redirectAdmin(
+      key,
+      sent > 0
+        ? `${sent} host-mails verstuurd.`
+        : "Geen host-mails verstuurd. Controleer of de mailprovider is ingesteld en of de host-mail aan staat.",
+      { step: "mails" }
+    );
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
       redirectAdmin(key, "Database niet bereikbaar. Host-mails kunnen pas met een echte database.", { step: "planning" });
+    }
+
+    throw error;
+  }
+}
+
+export async function reopenRoundAction(formData: FormData) {
+  const key = requireAdmin(formData);
+  const roundId = text(formData, "roundId");
+
+  try {
+    const confirmed = await prisma.mealMatch.count({
+      where: {
+        roundId,
+        status: MatchStatus.EATER_CONFIRMED
+      }
+    });
+
+    if (confirmed > 0) {
+      redirectAdmin(key, "Deze ronde heeft al bevestigde afspraken en kan niet terug naar concept.", {
+        step: "planning"
+      });
+    }
+
+    await prisma.$transaction([
+      prisma.mealMatch.updateMany({
+        where: {
+          roundId,
+          status: {
+            in: [
+              MatchStatus.HOST_INVITED,
+              MatchStatus.HOST_RESPONDED,
+              MatchStatus.EATER_INVITED,
+              MatchStatus.FALLBACK_SENT
+            ]
+          }
+        },
+        data: {
+          status: MatchStatus.DRAFT,
+          proposedDates: Prisma.JsonNull,
+          chosenDate: null,
+          hostNote: null,
+          hostInvitedAt: null,
+          hostRespondedAt: null,
+          eaterInvitedAt: null,
+          eaterRespondedAt: null,
+          fallbackSentAt: null
+        }
+      }),
+      prisma.matchRound.update({
+        where: { id: roundId },
+        data: { status: RoundStatus.DRAFT }
+      })
+    ]);
+
+    redirectAdmin(key, "Ronde staat weer op concept. Je kunt de matches nu aanpassen.", { step: "planning" });
+  } catch (error) {
+    if (databaseUnavailableNotice(error)) {
+      redirectAdmin(key, "Database niet bereikbaar. Ronde terugzetten kan pas met een echte database.", {
+        step: "planning"
+      });
     }
 
     throw error;

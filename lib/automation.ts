@@ -40,7 +40,7 @@ export async function sendHostInvitesForRound(roundId?: string) {
   let sent = 0;
   for (const match of matches) {
     const result = await sendHostInvite(match);
-    if (result.status === "skipped_disabled") {
+    if (result.status !== "sent" && result.status !== "skipped_existing") {
       continue;
     }
 
