@@ -29,7 +29,7 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
     label: "Welkom",
     description: "Naar iemand die zich aanmeldt.",
     title: "Je aanmelding staat erin",
-    subject: "Je aanmelding voor Houvast staat erin",
+    subject: "Je aanmelding voor Eters & Kokers staat erin",
     body: [
       "Hoi {{name}},",
       "",
@@ -64,7 +64,7 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
     label: "Host kiest dagen",
     description: "Naar de koker/host na goedkeuring van de matches.",
     title: "Je bent gekoppeld als host",
-    subject: "Houvast: kun je dagen kiezen voor {{eaterName}}?",
+    subject: "Eters & Kokers: kun je dagen kiezen voor {{eaterName}}?",
     body: [
       "Hoi {{hostName}},",
       "",
@@ -93,7 +93,7 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
     label: "Eter kiest dag",
     description: "Naar de eter nadat de host dagen heeft gekozen.",
     title: "Kies je definitieve dag",
-    subject: "Houvast: kies een dag bij {{hostName}}",
+    subject: "Eters & Kokers: kies een dag bij {{hostName}}",
     body: [
       "Hoi {{eaterName}},",
       "",
@@ -123,7 +123,7 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
     label: "Bevestiging host",
     description: "Naar de host nadat de eter een dag heeft gekozen.",
     title: "Jullie maaltijd is bevestigd",
-    subject: "Houvast bevestigd: {{eaterName}} komt eten",
+    subject: "Eters & Kokers bevestigd: {{eaterName}} komt eten",
     body: [
       "De maaltijd is bevestigd.",
       "",
@@ -150,7 +150,7 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
     label: "Bevestiging eter",
     description: "Naar de eter nadat een dag is gekozen.",
     title: "Jullie maaltijd is bevestigd",
-    subject: "Houvast bevestigd: eten bij {{hostName}}",
+    subject: "Eters & Kokers bevestigd: eten bij {{hostName}}",
     body: [
       "De maaltijd is bevestigd.",
       "",
@@ -177,7 +177,7 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
     label: "Fallback host",
     description: "Naar de host als het formulier niet op tijd rond is.",
     title: "Jullie zijn gekoppeld",
-    subject: "Houvast: neem contact op met {{eaterName}}",
+    subject: "Eters & Kokers: neem contact op met {{eaterName}}",
     body: [
       "{{reasonText}} Jullie zijn wel aan elkaar gekoppeld, dus neem rechtstreeks contact met elkaar op.",
       "",
@@ -205,7 +205,7 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
     label: "Fallback eter",
     description: "Naar de eter als het formulier niet op tijd rond is.",
     title: "Jullie zijn gekoppeld",
-    subject: "Houvast: neem contact op met {{hostName}}",
+    subject: "Eters & Kokers: neem contact op met {{hostName}}",
     body: [
       "{{reasonText}} Jullie zijn wel aan elkaar gekoppeld, dus neem rechtstreeks contact met elkaar op.",
       "",

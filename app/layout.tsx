@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Houvast Maaltijden",
+  title: "Eters & Kokers",
   description: "Een simpele maaltijd-randomizer voor de kerkgemeenschap."
 };
 
@@ -11,8 +11,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="nl">
       <body>
         <header className="topbar">
-          <a href="/" className="brand" aria-label="Houvast Maaltijden">
-            Houvast Maaltijden
+          <a href="/" className="brand" aria-label="Eters & Kokers">
+            Eters & Kokers
           </a>
           <a href="/aanmelden" className="admin-link">
             Aanmeldpagina

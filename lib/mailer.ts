@@ -34,7 +34,7 @@ function layout(title: string, body: string) {
     <div style="font-family:Arial,sans-serif;line-height:1.55;color:#17211c;max-width:640px;margin:0 auto;padding:24px">
       <h1 style="font-size:24px;margin:0 0 16px">${escapeHtml(title)}</h1>
       ${body}
-      <p style="margin-top:28px;color:#5e6b62;font-size:14px">Houvast maaltijd-randomizer</p>
+      <p style="margin-top:28px;color:#5e6b62;font-size:14px">Eters &amp; Kokers</p>
     </div>
   `;
 }
@@ -63,7 +63,7 @@ export async function sendEmail(input: EmailInput) {
     }
   }
 
-  const from = process.env.EMAIL_FROM || "Houvast <noreply@example.nl>";
+  const from = process.env.EMAIL_FROM || "Eters & Kokers <noreply@example.nl>";
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {

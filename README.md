@@ -1,4 +1,4 @@
-# Houvast Maaltijden
+# Eters & Kokers
 
 Een simpele maaltijd-randomizer voor contact binnen de kerkgemeenschap.
 

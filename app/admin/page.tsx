@@ -1139,7 +1139,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
       <section className="intro compact admin-topline">
         <div>
           <p className="eyebrow">Admin</p>
-          <h1>Houvast planning</h1>
+          <h1>Eters & Kokers planning</h1>
           <p>Doorloop de stappen. Klik een stap open, werk hem af, en verberg hem weer als je klaar bent.</p>
         </div>
         <DemoTools adminKey={key} />

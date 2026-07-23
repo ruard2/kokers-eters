@@ -223,14 +223,14 @@ export function demoAdminData() {
         type: "HOST_INVITE",
         toEmail: anna.email,
         status: "DEMO",
-        subject: "Houvast: kun je dagen kiezen voor Emma en Joost?"
+        subject: "Eters & Kokers: kun je dagen kiezen voor Emma en Joost?"
       },
       {
         id: "demo-mail-2",
         type: "EATER_CHOICE",
         toEmail: emmaJoost.email,
         status: "DEMO",
-        subject: "Houvast: kies een dag bij Anna de Vries"
+        subject: "Eters & Kokers: kies een dag bij Anna de Vries"
       }
     ]
   };
