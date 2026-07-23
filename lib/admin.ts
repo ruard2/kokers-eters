@@ -5,3 +5,7 @@ export function adminToken() {
 export function isAdminKey(value: string | undefined | null) {
   return Boolean(value && value === adminToken());
 }
+
+export function demoSeedEnabled() {
+  return process.env.ALLOW_DEMO_SEED === "true";
+}

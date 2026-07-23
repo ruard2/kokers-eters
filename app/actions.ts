@@ -2,7 +2,7 @@
 
 import { MatchStatus, ParticipationMode } from "@prisma/client";
 import { redirect } from "next/navigation";
-import { isAdminKey } from "@/lib/admin";
+import { demoSeedEnabled, isAdminKey } from "@/lib/admin";
 import { runDueJobs, sendHostInvitesForRound, sendPreferenceChecksForMonth } from "@/lib/automation";
 import { dateInputToDate, jsonDateList, parseMonthInput } from "@/lib/dates";
 import {
@@ -19,6 +19,7 @@ import {
 import { sendConfirmationEmails, sendEaterChoiceEmail, sendWelcomeEmail } from "@/lib/mailer";
 import { generateRoundForMonth } from "@/lib/matching";
 import { prisma } from "@/lib/db";
+import { clearDemoData, seedDemoData } from "@/lib/seed";
 import { createToken } from "@/lib/tokens";
 
 const matchInclude = {
@@ -296,6 +297,42 @@ export async function runJobsAction(formData: FormData) {
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
       redirectAdmin(key, "Database niet bereikbaar. Automatische jobs kunnen pas met een echte database.");
+    }
+
+    throw error;
+  }
+}
+
+export async function seedDemoAction(formData: FormData) {
+  const key = requireAdmin(formData);
+  if (!demoSeedEnabled()) {
+    redirectAdmin(key, "Demo-seed staat uit. Zet ALLOW_DEMO_SEED=true om te kunnen seeden.");
+  }
+
+  try {
+    const result = await seedDemoData();
+    redirectAdmin(key, `Demo-data geladen: ${result.participants} deelnemers, ${result.matched} matches.`);
+  } catch (error) {
+    if (databaseUnavailableNotice(error)) {
+      redirectAdmin(key, "Database niet bereikbaar. Demo-data kan pas met een echte database geladen worden.");
+    }
+
+    throw error;
+  }
+}
+
+export async function clearDemoAction(formData: FormData) {
+  const key = requireAdmin(formData);
+  if (!demoSeedEnabled()) {
+    redirectAdmin(key, "Demo-seed staat uit. Zet ALLOW_DEMO_SEED=true om demo-data te kunnen wissen.");
+  }
+
+  try {
+    const result = await clearDemoData();
+    redirectAdmin(key, `Demo-data gewist: ${result.removedParticipants} test-deelnemers verwijderd.`);
+  } catch (error) {
+    if (databaseUnavailableNotice(error)) {
+      redirectAdmin(key, "Database niet bereikbaar. Demo-data kan pas met een echte database gewist worden.");
     }
 
     throw error;

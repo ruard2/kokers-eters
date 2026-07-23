@@ -1,11 +1,14 @@
 import {
   cancelMatchAction,
+  clearDemoAction,
   generateMonthlyRoundAction,
   runJobsAction,
+  seedDemoAction,
   sendHostInvitesAction,
   sendPreferenceChecksAction
 } from "@/app/actions";
-import { isAdminKey } from "@/lib/admin";
+import { AdminMatchBoard, type BoardMatch } from "@/components/AdminMatchBoard";
+import { demoSeedEnabled, isAdminKey } from "@/lib/admin";
 import { displayDate, displayMonth, jsonDateList, monthInputValue, toMonthStart } from "@/lib/dates";
 import { demoAdminData } from "@/lib/demo-data";
 import { prisma } from "@/lib/db";
@@ -50,6 +53,57 @@ function statusLabel(value: string) {
   };
 
   return labels[value] || value;
+}
+
+type AdminParticipantLike = {
+  id: string;
+  name: string;
+  email: string;
+  whatsapp: string;
+  mode: string;
+  hostCapacity: number | null;
+  allergies: string | null;
+  address: string | null;
+  cookingPlan: string | null;
+  communityScope: string;
+  gatheringType: string;
+};
+
+type AdminMatchLike = {
+  id: string;
+  roundId: string;
+  status: string;
+  partySize: number;
+  createdAt: Date;
+  host: AdminParticipantLike;
+  eater: AdminParticipantLike;
+};
+
+function boardParticipant(participant: AdminParticipantLike) {
+  return {
+    id: participant.id,
+    name: participant.name,
+    email: participant.email,
+    whatsapp: participant.whatsapp,
+    mode: participant.mode,
+    hostCapacity: participant.hostCapacity,
+    allergies: participant.allergies,
+    address: participant.address,
+    cookingPlan: participant.cookingPlan,
+    communityScope: participant.communityScope,
+    gatheringType: participant.gatheringType
+  };
+}
+
+function boardMatch(match: AdminMatchLike): BoardMatch {
+  return {
+    id: match.id,
+    roundId: match.roundId,
+    status: match.status,
+    partySize: match.partySize,
+    host: boardParticipant(match.host),
+    eater: boardParticipant(match.eater)
+  };
 }
 
 export default async function AdminPage({ searchParams }: PageProps) {
@@ -102,18 +156,53 @@ export default async function AdminPage({ searchParams }: PageProps) {
   }
 
   const defaultMonth = monthInputValue(toMonthStart(new Date()));
+  const showDemoTools = demoSeedEnabled();
+  const reviewRound =
+    rounds.find((round) => matches.some((match) => match.roundId === round.id && match.status === "DRAFT")) ||
+    rounds.find((round) => matches.some((match) => match.roundId === round.id));
+  const reviewMatches = reviewRound
+    ? matches
+        .filter((match) => match.roundId === reviewRound.id && match.status !== "CANCELLED")
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    : [];
+  const draftReviewMatches = reviewMatches.filter((match) => match.status === "DRAFT");
 
   return (
     <div className="page wide-page">
-      <section className="intro compact">
-        <p className="eyebrow">Admin</p>
-        <h1>Rondes en matches</h1>
-        <p>Maak rondes, verstuur host-mails en controleer wat de randomizer heeft gedaan.</p>
-        <div className="intro-actions">
-          <a className="button secondary" href="/aanmelden">
-            Deel aanmeldpagina
-          </a>
+      <section className="intro compact" style={{ display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div>
+          <p className="eyebrow">Admin</p>
+          <h1>Rondes en matches</h1>
+          <p>Maak rondes, verstuur host-mails en controleer wat de randomizer heeft gedaan.</p>
+          <div className="intro-actions">
+            <a className="button secondary" href="/aanmelden">
+              Deel aanmeldpagina
+            </a>
+          </div>
         </div>
+
+        {showDemoTools ? (
+          <div
+            className="panel"
+            style={{ display: "flex", flexDirection: "column", gap: "0.5rem", minWidth: "12rem", padding: "0.75rem" }}
+          >
+            <p className="eyebrow" style={{ margin: 0 }}>
+              Demo (alleen ontwikkelfase)
+            </p>
+            <form action={seedDemoAction}>
+              <input type="hidden" name="adminKey" value={key} />
+              <button type="submit" className="small" style={{ width: "100%" }}>
+                Demo-data laden
+              </button>
+            </form>
+            <form action={clearDemoAction}>
+              <input type="hidden" name="adminKey" value={key} />
+              <button type="submit" className="small danger" style={{ width: "100%" }}>
+                Demo-data wissen
+              </button>
+            </form>
+          </div>
+        ) : null}
       </section>
 
       {notice ? <div className="notice success">{notice}</div> : null}
@@ -148,6 +237,26 @@ export default async function AdminPage({ searchParams }: PageProps) {
           <p>Run de automatische taken nu handmatig.</p>
           <button type="submit">Jobs draaien</button>
         </form>
+      </section>
+
+      <section className="panel match-review-panel">
+        <div className="section-header match-review-header">
+          <div>
+            <p className="eyebrow">Goedkeuring</p>
+            <h2>Conceptverbindingen</h2>
+            <span className="review-month">{reviewRound ? displayMonth(reviewRound.month) : "Geen ronde"}</span>
+          </div>
+          {reviewRound ? (
+            <form action={sendHostInvitesAction}>
+              <input type="hidden" name="adminKey" value={key} />
+              <input type="hidden" name="roundId" value={reviewRound.id} />
+              <button disabled={usingDemoData || draftReviewMatches.length === 0} type="submit">
+                Goedkeuren + host-mails
+              </button>
+            </form>
+          ) : null}
+        </div>
+        <AdminMatchBoard adminKey={key} disabled={usingDemoData} initialMatches={reviewMatches.map(boardMatch)} />
       </section>
 
       <section className="panel worksheet-panel">
@@ -263,7 +372,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
                       <input type="hidden" name="adminKey" value={key} />
                       <input type="hidden" name="roundId" value={round.id} />
                       <button type="submit" className="small">
-                        Host-mails
+                        Goedkeuren + mails
                       </button>
                     </form>
                   </td>

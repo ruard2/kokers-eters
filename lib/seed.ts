@@ -2,10 +2,9 @@ import {
   CommunityScope,
   Frequency,
   GatheringType,
-  MatchStatus,
   ParticipationMode
 } from "@prisma/client";
-import { addMonths, dateInputToDate, toMonthStart } from "./dates";
+import { addMonths, toMonthStart } from "./dates";
 import { prisma } from "./db";
 import { generateRoundForMonth } from "./matching";
 import { createToken } from "./tokens";
@@ -305,14 +304,6 @@ const demoParticipants: DemoParticipant[] = [
   }
 ];
 
-function nextDate(month: Date, dayOffset: number) {
-  // Houd de dag binnen een veilige range (5..25) zodat de datum in de maand blijft.
-  const day = 5 + (dayOffset % 20);
-  return new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth(), day, 18, 0, 0, 0))
-    .toISOString()
-    .slice(0, 10);
-}
-
 export type SeedResult = {
   month: string;
   participants: number;
@@ -320,6 +311,30 @@ export type SeedResult = {
   requested: number;
   hosts: number;
 };
+
+export type ClearResult = {
+  removedParticipants: number;
+};
+
+/**
+ * Verwijdert alle rondes/matches/mails en de test-accounts (@houvast.local).
+ * Echte aanmeldingen met een ander e-maildomein blijven bestaan.
+ */
+export async function clearDemoData(): Promise<ClearResult> {
+  await prisma.emailLog.deleteMany();
+  await prisma.mealMatch.deleteMany();
+  await prisma.roundOptOut.deleteMany();
+  await prisma.matchRound.deleteMany();
+  const removed = await prisma.participant.deleteMany({
+    where: {
+      email: {
+        endsWith: DEMO_EMAIL_DOMAIN
+      }
+    }
+  });
+
+  return { removedParticipants: removed.count };
+}
 
 /**
  * Vult de database met test-deelnemers en een concept-ronde voor volgende maand.
@@ -353,38 +368,6 @@ export async function seedDemoData(): Promise<SeedResult> {
   }
 
   const result = await generateRoundForMonth(month);
-  const matches = await prisma.mealMatch.findMany({
-    where: { roundId: result.roundId },
-    orderBy: { createdAt: "asc" },
-    include: { host: true, eater: true }
-  });
-
-  for (const [index, match] of matches.entries()) {
-    const proposedDates = [
-      nextDate(month, index * 2),
-      nextDate(month, index * 2 + 3),
-      nextDate(month, index * 2 + 7)
-    ];
-
-    // Verdeel de matches over verschillende statussen zodat elke fase getest kan worden.
-    const cycle = index % 3;
-    const status =
-      cycle === 0 ? MatchStatus.EATER_CONFIRMED : cycle === 1 ? MatchStatus.EATER_INVITED : MatchStatus.HOST_RESPONDED;
-
-    await prisma.mealMatch.update({
-      where: { id: match.id },
-      data: {
-        status,
-        proposedDates,
-        hostNote: "Laat even weten of er nog iets is om rekening mee te houden.",
-        hostRespondedAt: new Date(),
-        eaterInvitedAt:
-          status === MatchStatus.EATER_INVITED || status === MatchStatus.EATER_CONFIRMED ? new Date() : null,
-        chosenDate: status === MatchStatus.EATER_CONFIRMED ? dateInputToDate(proposedDates[0]) : null,
-        eaterRespondedAt: status === MatchStatus.EATER_CONFIRMED ? new Date() : null
-      }
-    });
-  }
 
   return {
     month: month.toISOString().slice(0, 7),
