@@ -4,7 +4,7 @@ import { CommunityScope, Frequency, GatheringType, MatchStatus, ParticipationMod
 import { redirect } from "next/navigation";
 import { demoSeedEnabled, isAdminKey } from "@/lib/admin";
 import { runDueJobs, sendHostInvitesForRound, sendPreferenceChecksForMonth } from "@/lib/automation";
-import { addMonths, dateInputToDate, jsonDateList, parseMonthInput } from "@/lib/dates";
+import { addMonths, dateInputToDate, jsonDateList, monthInputValue, parseMonthInput } from "@/lib/dates";
 import {
   frequency,
   gatheringType,
@@ -308,12 +308,23 @@ export async function generatePlanningAction(formData: FormData) {
       update: settings
     });
 
+    const plannedMonths = Array.from({ length: horizonMonths }, (_item, index) => addMonths(startMonth, index));
+    const cleanup = await prisma.matchRound.deleteMany({
+      where: {
+        status: RoundStatus.DRAFT,
+        month: {
+          gte: startMonth,
+          notIn: plannedMonths
+        }
+      }
+    });
+
     let matched = 0;
     let requested = 0;
     let skipped = 0;
-    for (let index = 0; index < horizonMonths; index += 1) {
+    for (const plannedMonth of plannedMonths) {
       try {
-        const result = await generateRoundForMonth(addMonths(startMonth, index));
+        const result = await generateRoundForMonth(plannedMonth);
         matched += result.matched;
         requested += result.requested;
       } catch (error) {
@@ -329,8 +340,8 @@ export async function generatePlanningAction(formData: FormData) {
 
     redirectAdmin(
       key,
-      `${horizonMonths - skipped} ronde(s) klaargezet: ${matched} matches voor ${requested} eetverzoeken.${skipped ? ` ${skipped} bestaande verstuurde ronde(s) overgeslagen.` : ""}`,
-      { step: "planning" }
+      `${horizonMonths - skipped} ronde(s) klaargezet: ${matched} matches voor ${requested} eetverzoeken.${cleanup.count ? ` ${cleanup.count} oude conceptronde(s) verwijderd.` : ""}${skipped ? ` ${skipped} bestaande verstuurde ronde(s) overgeslagen.` : ""}`,
+      { step: "planning", startMonth: monthInputValue(startMonth) }
     );
   } catch (error) {
     if (databaseUnavailableNotice(error)) {

@@ -15,7 +15,7 @@ import { AdminMatchBoard, type BoardMatch, type BoardRosterParticipant } from "@
 import { CopyButton } from "@/components/CopyButton";
 import { CopyQrButton } from "@/components/CopyQrButton";
 import { demoSeedEnabled, isAdminKey } from "@/lib/admin";
-import { displayDate, displayMonth, jsonDateList, monthInputValue, toMonthStart } from "@/lib/dates";
+import { addMonths, displayDate, displayMonth, jsonDateList, monthInputValue, parseMonthInput, toMonthStart } from "@/lib/dates";
 import { demoAdminData } from "@/lib/demo-data";
 import { prisma } from "@/lib/db";
 import { adminMailTemplateDefinitions } from "@/lib/mail-templates";
@@ -528,11 +528,10 @@ function RoundsAccordion({
                 <div className="round-review">
                   <div className="section-header match-review-header">
                     <div>
-                      <h3>Matches controleren en goedkeuren</h3>
+                      <h3>Matches aanpassen</h3>
                       <p>
-                        De matches zijn automatisch gegenereerd. Klik een persoon aan en klik daarna een andere
-                        verbinding om te wisselen, of sleep blokjes. Groen betekent dat capaciteit, rol, vorm en
-                        admin-blokkades kloppen. Permanente blokkades zet je in de sheet bij <strong>Niet met</strong>.
+                        Sleep een host of eter naar een andere regel om te wisselen. Groen kan, rood kan niet.
+                        Permanente blokkades zet je in de sheet bij <strong>Niet met</strong>.
                       </p>
                     </div>
                     <div className="inline-actions">
@@ -551,10 +550,12 @@ function RoundsAccordion({
                     </div>
                   </div>
                   <AdminMatchBoard
+                    key={`${round.id}-${round.updatedAt.getTime()}-${draftCount}-${roundMatches.length}`}
                     adminKey={adminKey}
-                    disabled={usingDemoData}
+                    disabled={false}
                     initialMatches={roundMatches.map(boardMatch)}
                     participants={participants.map(boardRosterParticipant)}
+                    saveChanges={!usingDemoData}
                   />
                 </div>
               ) : (
@@ -1117,7 +1118,12 @@ export default async function AdminPage({ searchParams }: PageProps) {
   }
 
   const signupUrl = appUrl("/aanmelden");
-  const defaultMonth = monthInputValue(toMonthStart(new Date()));
+  const queryStartMonth = first(query.startMonth);
+  const defaultMonth =
+    queryStartMonth && /^\d{4}-\d{2}$/.test(queryStartMonth) ? queryStartMonth : monthInputValue(toMonthStart(new Date()));
+  const planningStart = parseMonthInput(defaultMonth);
+  const planningEnd = addMonths(planningStart, planningSettings.horizonMonths);
+  const planningRounds = rounds.filter((round) => round.month >= planningStart && round.month < planningEnd);
   const reviewRound =
     rounds.find((round) => matches.some((match) => match.roundId === round.id && match.status === "DRAFT")) ||
     rounds.find((round) => matches.some((match) => match.roundId === round.id));
@@ -1166,7 +1172,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
           matches={matches}
           participants={participants}
           planningSettings={planningSettings}
-          rounds={rounds}
+          rounds={planningRounds}
           showSheet={showSheet}
           usingDemoData={usingDemoData}
         />

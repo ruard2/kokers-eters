@@ -50,6 +50,7 @@ type AdminMatchBoardProps = {
   disabled: boolean;
   initialMatches: BoardMatch[];
   participants: BoardRosterParticipant[];
+  saveChanges: boolean;
 };
 
 const manyMatchesLimit = 14;
@@ -348,7 +349,7 @@ function ParticipantTile({
   );
 }
 
-export function AdminMatchBoard({ adminKey, disabled, initialMatches, participants }: AdminMatchBoardProps) {
+export function AdminMatchBoard({ adminKey, disabled, initialMatches, participants, saveChanges }: AdminMatchBoardProps) {
   const [matches, setMatches] = useState(initialMatches);
   const [selected, setSelected] = useState<DragPayload | null>(null);
   const [busy, setBusy] = useState(false);
@@ -387,6 +388,12 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
     setMessage(null);
     setSelected(null);
     setMatches((current) => swapSide(current, payload, targetMatchId));
+
+    if (!saveChanges) {
+      setBusy(false);
+      setMessage("Concept aangepast in demo. Niet opgeslagen in database.");
+      return;
+    }
 
     try {
       const response = await fetch("/api/admin/matches/reassign", {
@@ -481,7 +488,7 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
         {error ? <div className="notice error board-notice">{error}</div> : null}
         {editableCount > 0 ? (
           <div className="board-help">
-            Klik een host of eter aan en klik daarna een andere verbinding om te wisselen. Slepen kan ook.
+            Sleep een host of eter naar een andere regel. Groen kan, rood kan niet. Klik-klik kan ook.
           </div>
         ) : (
           <div className="notice board-notice">
