@@ -4,9 +4,11 @@ import {
   ParticipationMode,
   type Participant
 } from "@prisma/client";
+import type { SignupBalance } from "@/lib/signup-balance";
 import { UnavailableDaysField } from "./UnavailableDaysField";
 
 type Props = {
+  balance?: SignupBalance | null;
   participant?: Participant;
   showActive?: boolean;
 };
@@ -16,7 +18,27 @@ function value(participant: Participant | undefined, key: keyof Participant, fal
   return typeof item === "string" || typeof item === "number" ? String(item) : fallback;
 }
 
-export function ParticipantFormFields({ participant, showActive = false }: Props) {
+function SignupBalanceNudge({ balance }: { balance?: SignupBalance | null }) {
+  if (!balance) {
+    return null;
+  }
+
+  return (
+    <div className={`balance-nudge ${balance.tone}`}>
+      <p>{balance.description}</p>
+      <div className="balance-mini" aria-label="Balans tussen eten en koken">
+        <span className="eater-bar" style={{ width: `${balance.eaterPercent}%` }} />
+        <span className="host-bar" style={{ width: `${balance.hostPercent}%` }} />
+      </div>
+      <div className="balance-mini-labels">
+        <span>Eten: {balance.eaterNeed}</span>
+        <span>Koken: {balance.hostSupply}</span>
+      </div>
+    </div>
+  );
+}
+
+export function ParticipantFormFields({ balance, participant, showActive = false }: Props) {
   const mode = participant?.mode || ParticipationMode.BOTH;
   const gatheringType = participant?.gatheringType || GatheringType.BOTH;
 
@@ -45,6 +67,7 @@ export function ParticipantFormFields({ participant, showActive = false }: Props
             <span>Allebei</span>
           </label>
         </div>
+        <SignupBalanceNudge balance={balance} />
       </section>
 
       <section className="form-section wide">

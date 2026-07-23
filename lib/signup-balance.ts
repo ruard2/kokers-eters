@@ -13,8 +13,6 @@ export type SignupBalance = {
   eaterPercent: number;
   hostPercent: number;
   tone: SignupBalanceTone;
-  title: string;
-  badge: string;
   description: string;
 };
 
@@ -75,10 +73,7 @@ export function calculateSignupBalance(participants: BalanceParticipant[]): Sign
       eaterPercent: 0,
       hostPercent: 0,
       tone: "starting",
-      title: "De eerste aanmeldingen bepalen de balans.",
-      badge: "Alles welkom",
-      description:
-        "Kies wat bij je past. Als je allebei kunt, helpt dat de planning straks het meest."
+      description: "Er zijn nog weinig aanmeldingen. Kies wat bij je past. Allebei helpt de planning het meest."
     };
   }
 
@@ -89,10 +84,8 @@ export function calculateSignupBalance(participants: BalanceParticipant[]): Sign
       eaterPercent,
       hostPercent,
       tone: "hosts-needed",
-      title: "Er zijn vooral kokers nodig.",
-      badge: "Ontvangen helpt nu",
       description:
-        'Kun je je tafel openzetten? Kies dan "Eters ontvangen" of "Allebei". Zo komen de eters makkelijker goed terecht.'
+        'Er zijn op dit moment meer mensen die willen eten dan mensen die kunnen koken. Kies dus vooral "Eters ontvangen" of "Allebei".'
     };
   }
 
@@ -103,10 +96,8 @@ export function calculateSignupBalance(participants: BalanceParticipant[]): Sign
       eaterPercent,
       hostPercent,
       tone: "eaters-needed",
-      title: "Er is ruimte aan tafels.",
-      badge: "Aanschuiven helpt nu",
       description:
-        'Wil je bij iemand eten? Kies dan "Bij iemand eten" of "Allebei". Er zijn nu meer ontvangplekken dan eters.'
+        'Er zijn op dit moment meer mensen die willen koken dan eten. Kies dus vooral "Bij iemand eten" of "Allebei".'
     };
   }
 
@@ -116,9 +107,6 @@ export function calculateSignupBalance(participants: BalanceParticipant[]): Sign
     eaterPercent,
     hostPercent,
     tone: "balanced",
-    title: "Kokers en eters zijn mooi in balans.",
-    badge: "Kies wat past",
-    description:
-      'De planning kan hiermee goed rondkomen. "Allebei" blijft de meest flexibele keuze.'
+    description: 'Kokers en eters zijn nu ongeveer in balans. Kies gewoon wat bij je past. "Allebei" mag natuurlijk ook.'
   };
 }

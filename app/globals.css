@@ -135,108 +135,44 @@ p {
   padding: 24px;
 }
 
-.balance-card {
-  background: #fff;
+.balance-nudge {
+  background: #fbfcfa;
   border: 1px solid var(--line);
-  border-left: 5px solid var(--green);
   border-radius: 8px;
-  box-shadow: var(--shadow);
   display: grid;
-  gap: 14px;
-  margin: 0 0 20px;
-  padding: 18px;
+  gap: 8px;
+  padding: 10px 12px;
 }
 
-.balance-card.hosts-needed {
-  border-left-color: #b98515;
+.balance-nudge.hosts-needed {
+  border-color: #dfc26f;
 }
 
-.balance-card.eaters-needed {
-  border-left-color: var(--blue);
+.balance-nudge.eaters-needed {
+  border-color: #9ab5d1;
 }
 
-.balance-card.starting {
-  border-left-color: var(--muted);
-}
-
-.balance-head {
-  align-items: flex-start;
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-}
-
-.balance-head .eyebrow {
-  margin-bottom: 5px;
-}
-
-.balance-head h2 {
+.balance-nudge p {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
   margin: 0;
 }
 
-.balance-head strong {
-  background: var(--success);
-  border-radius: 999px;
-  color: var(--green-dark);
-  display: inline-flex;
-  font-size: 12px;
-  font-weight: 900;
-  justify-content: center;
-  line-height: 1.2;
-  padding: 7px 10px;
-  white-space: nowrap;
-}
-
-.balance-card.hosts-needed .balance-head strong {
-  background: var(--warning);
-  color: #74550f;
-}
-
-.balance-card.eaters-needed .balance-head strong {
-  background: #eaf2fa;
-  color: var(--blue);
-}
-
-.balance-card.starting .balance-head strong {
-  background: #eef3ef;
-  color: var(--muted);
-}
-
-.balance-bars {
-  display: grid;
-  gap: 9px;
-}
-
-.balance-row {
+.balance-mini {
   align-items: center;
   display: grid;
-  gap: 10px;
-  grid-template-columns: 190px minmax(0, 1fr) 48px;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
-.balance-row span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.balance-row b {
-  font-size: 14px;
-  text-align: right;
-}
-
-.balance-track {
-  background: #eef3ef;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  height: 14px;
-  overflow: hidden;
-}
-
-.balance-track i {
+.balance-mini span {
   border-radius: 999px;
   display: block;
-  height: 100%;
+  height: 8px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .eater-bar {
@@ -245,17 +181,15 @@ p {
 
 .host-bar {
   background: var(--green);
+  justify-self: end;
 }
 
-.balance-card p {
-  color: var(--ink);
-  font-size: 14px;
-  line-height: 1.45;
-  margin: 0;
-}
-
-.balance-card p span {
+.balance-mini-labels {
   color: var(--muted);
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  justify-content: space-between;
 }
 
 .centered {
@@ -1560,18 +1494,9 @@ th {
   }
 
   .admin-topline,
-  .balance-head,
   .approval-panel,
   .mail-round-row {
     display: grid;
-  }
-
-  .balance-row {
-    grid-template-columns: minmax(0, 1fr) 46px;
-  }
-
-  .balance-row span {
-    grid-column: 1 / -1;
   }
 
   .flow-steps {
