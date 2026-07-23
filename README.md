@@ -68,7 +68,6 @@ Zet daarna deze variabelen op de app-service:
 - `APP_URL`
 - `ADMIN_TOKEN`
 - `CRON_SECRET`
-- `PORT=8081`
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
 - `AUTO_GENERATE_ROUNDS`
@@ -77,7 +76,28 @@ Zet daarna deze variabelen op de app-service:
 
 Gebruik de `DATABASE_URL` van Railway PostgreSQL. `APP_URL` moet de publieke Railway URL van de app zijn, bijvoorbeeld `https://kokers-eters-production.up.railway.app`.
 
-De publieke Railway-domain staat in deze setup op target port `8081`. Zet daarom ook de service variable `PORT=8081`; Railway gebruikt `PORT` voor healthchecks en de app luistert op `0.0.0.0:$PORT`. Gebruik geen `APP_PORT` in Railway. Zonder `PORT` gebruikt het startscript alleen lokaal fallback `8081`. De database-migraties draaien in Railway via de pre-deploy stap als `DATABASE_URL` goed staat. Als de database nog niet bereikbaar is, start de app alsnog met de demo/fallback adminweergave. Zet `REQUIRE_DATABASE_MIGRATIONS=true` als een deploy juist moet falen wanneer migraties niet lukken.
+### Poort (belangrijk, dit veroorzaakt 502)
+
+Railway injecteert zelf een `PORT` in de container (standaard `8080`). Het startscript luistert op `0.0.0.0:$PORT`, dus de app volgt automatisch de door Railway gegeven poort. **Zet `PORT` daarom niet handmatig**, tenzij je precies weet wat je doet.
+
+De publieke domain in Railway heeft een apart **"target port"** veld (Settings → Networking → Public Networking). Dit veld moet gelijk zijn aan de poort waarop de app luistert. De regel is simpel:
+
+> De target port van de domain === de poort in de deploy-log `"[start] Starting Next.js on 0.0.0.0:<poort>"`.
+
+Twee geldige configuraties:
+
+1. **Aanbevolen:** zet géén `PORT` variable, laat Railway `8080` injecteren, en zet de domain target port op `8080`.
+2. Of zet service variable `PORT=8081` én de domain target port op `8081`.
+
+Als deze twee getallen niet gelijk zijn, geeft de publieke URL `502` terwijl de deploy en healthcheck groen zijn (de healthcheck test op de door Railway geïnjecteerde poort, de publieke URL op de domain target port).
+
+De database-migraties draaien in Railway via de pre-deploy stap als `DATABASE_URL` goed staat. Als de database nog niet bereikbaar is, start de app alsnog met de demo/fallback adminweergave. Zet `REQUIRE_DATABASE_MIGRATIONS=true` als een deploy juist moet falen wanneer migraties niet lukken.
+
+### 502 op de publieke URL oplossen
+
+1. Open de deploy-logs en zoek de regel `"[start] Starting Next.js on 0.0.0.0:<poort>"`.
+2. Open Settings → Networking → Public Networking en kijk naar de target port achter de domain (het `→ Port ...` label).
+3. Zorg dat beide getallen gelijk zijn. Pas het target-port veld aan (direct effect, geen redeploy nodig) óf zet de `PORT` variable gelijk aan de target port (redeploy nodig).
 
 ## Automatische jobs
 

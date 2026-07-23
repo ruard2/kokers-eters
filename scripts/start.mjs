@@ -12,9 +12,15 @@ if (!existsSync(nextBin)) {
 
 if (!process.env.PORT) {
   console.warn("[start] PORT is not set; falling back to local port 8081.");
+} else {
+  console.log(`[start] PORT from environment is ${process.env.PORT}.`);
 }
 
 console.log(`[start] Starting Next.js on 0.0.0.0:${port}`);
+console.log(
+  `[start] IMPORTANT: the Railway public domain 'target port' MUST equal ${port}, ` +
+    "otherwise the public URL returns 502 even though this container is healthy."
+);
 
 const child = spawn(process.execPath, [nextBin, "start", "--hostname", "0.0.0.0", "--port", port], {
   cwd: process.cwd(),
