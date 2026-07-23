@@ -6,7 +6,7 @@
   },
   "deploy": {
     "preDeployCommand": "node scripts/migrate-deploy-optional.mjs",
-    "startCommand": "npm run start",
+    "startCommand": "APP_PORT=8081 node scripts/start.mjs",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
