@@ -73,11 +73,11 @@ Zet daarna deze variabelen op de app-service:
 - `AUTO_GENERATE_ROUNDS`
 - `AUTO_SEND_ROUNDS`
 - optioneel: `REQUIRE_DATABASE_MIGRATIONS`
-- optioneel: `APP_PORT=8081`
+- optioneel lokaal: `APP_PORT=8081`
 
 Gebruik de `DATABASE_URL` van Railway PostgreSQL. `APP_URL` moet de publieke Railway URL van de app zijn, bijvoorbeeld `https://kokers-eters-production.up.railway.app`.
 
-De app start via een klein Node-script dat expliciet luistert op `0.0.0.0:8081` via `APP_PORT=8081` in `railway.json`. Zonder `APP_PORT` gebruikt het script Railway's `PORT`, en daarna fallback `8081`. De database-migraties draaien in Railway via de pre-deploy stap als `DATABASE_URL` goed staat. Als de database nog niet bereikbaar is, start de app alsnog met de demo/fallback adminweergave. Zet `REQUIRE_DATABASE_MIGRATIONS=true` als een deploy juist moet falen wanneer migraties niet lukken.
+De app start via een klein Node-script dat expliciet luistert op `0.0.0.0:$PORT`, zoals Railway verwacht. Zonder Railway `PORT` gebruikt het script lokaal `APP_PORT`, en daarna fallback `8081`. De database-migraties draaien in Railway via de pre-deploy stap als `DATABASE_URL` goed staat. Als de database nog niet bereikbaar is, start de app alsnog met de demo/fallback adminweergave. Zet `REQUIRE_DATABASE_MIGRATIONS=true` als een deploy juist moet falen wanneer migraties niet lukken.
 
 ## Automatische jobs
 

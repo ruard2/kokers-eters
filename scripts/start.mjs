@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-const port = process.env.APP_PORT || process.env.PORT || "8081";
+const port = process.env.PORT || process.env.APP_PORT || "8081";
 const nextBin = join(process.cwd(), "node_modules", "next", "dist", "bin", "next");
 
 if (!existsSync(nextBin)) {
