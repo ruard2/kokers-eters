@@ -273,7 +273,7 @@ export async function generateMonthlyRoundAction(formData: FormData) {
   const month = parseMonthInput(text(formData, "month"));
   try {
     const result = await generateRoundForMonth(month);
-    redirectAdmin(key, `${result.matched} matches gemaakt voor ${result.requested} eetverzoeken.`, { step: "review" });
+    redirectAdmin(key, `${result.matched} matches gemaakt voor ${result.requested} eetverzoeken.`, { step: "planning" });
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
       redirectAdmin(key, "Database niet bereikbaar. Demo-werkblad blijft zichtbaar; start Postgres voor echte acties.", {
@@ -330,7 +330,7 @@ export async function generatePlanningAction(formData: FormData) {
     redirectAdmin(
       key,
       `${horizonMonths - skipped} ronde(s) klaargezet: ${matched} matches voor ${requested} eetverzoeken.${skipped ? ` ${skipped} bestaande verstuurde ronde(s) overgeslagen.` : ""}`,
-      { step: "review" }
+      { step: "planning" }
     );
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
@@ -351,7 +351,7 @@ export async function sendHostInvitesAction(formData: FormData) {
     redirectAdmin(key, `${sent} host-mails verstuurd.`, { step: "mails" });
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
-      redirectAdmin(key, "Database niet bereikbaar. Host-mails kunnen pas met een echte database.", { step: "review" });
+      redirectAdmin(key, "Database niet bereikbaar. Host-mails kunnen pas met een echte database.", { step: "planning" });
     }
 
     throw error;
@@ -540,10 +540,10 @@ export async function cancelMatchAction(formData: FormData) {
       where: { id: matchId },
       data: { status: MatchStatus.CANCELLED }
     });
-    redirectAdmin(key, "Match geannuleerd.", { step: "review" });
+    redirectAdmin(key, "Match geannuleerd.", { step: "planning" });
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
-      redirectAdmin(key, "Database niet bereikbaar. Demo-matches kun je niet wijzigen.", { step: "review" });
+      redirectAdmin(key, "Database niet bereikbaar. Demo-matches kun je niet wijzigen.", { step: "planning" });
     }
 
     throw error;

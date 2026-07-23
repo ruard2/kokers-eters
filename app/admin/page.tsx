@@ -37,12 +37,11 @@ type MatchWithPeople = MealMatch & {
   round: MatchRound;
 };
 
-type StepKey = "participants" | "planning" | "review" | "mails" | "summary";
+type StepKey = "participants" | "planning" | "mails" | "summary";
 
 const steps: Array<{ key: StepKey; label: string; helper: string }> = [
   { key: "participants", label: "Deelnemers toevoegen", helper: "Aanmeldlink, QR en sheet" },
-  { key: "planning", label: "Rondes klaarzetten", helper: "Een ronde, kwartaal of jaar" },
-  { key: "review", label: "Matches goedkeuren", helper: "Schuiven en blokkades" },
+  { key: "planning", label: "Rondes + matches", helper: "Klaarzetten, schuiven, goedkeuren" },
   { key: "mails", label: "Mails klaarzetten", helper: "Concepten controleren" },
   { key: "summary", label: "Samenvatting afronden", helper: "Planning en akkoord" }
 ];
@@ -53,6 +52,10 @@ function first(value: string | string[] | undefined) {
 
 function activeStep(value: string | string[] | undefined): StepKey | "" {
   const step = first(value);
+  if (step === "review") {
+    return "planning";
+  }
+
   return steps.some((item) => item.key === step) ? (step as StepKey) : "";
 }
 
@@ -679,20 +682,30 @@ function StepOne({
 function StepTwo({
   adminKey,
   defaultMonth,
+  draftReviewMatches,
   matches,
+  participants,
   planningSettings,
+  reviewMatches,
+  reviewRound,
   rounds,
+  showSheet,
   usingDemoData
 }: {
   adminKey: string;
   defaultMonth: string;
+  draftReviewMatches: MatchWithPeople[];
   matches: MatchWithPeople[];
+  participants: Participant[];
   planningSettings: PlanningSettingsView;
+  reviewMatches: MatchWithPeople[];
+  reviewRound: RoundWithMatches | undefined;
   rounds: RoundWithMatches[];
+  showSheet: boolean;
   usingDemoData: boolean;
 }) {
   return (
-    <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 2" title="Rondes klaarzetten">
+    <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 2" title="Rondes en matches klaarzetten">
       <form action={generatePlanningAction} className="planning-form">
         <input type="hidden" name="adminKey" value={adminKey} />
         <input type="hidden" name="adminCheckDaysBefore" value={planningSettings.adminCheckDaysBefore} />
@@ -730,7 +743,7 @@ function StepTwo({
         </div>
         <div>
           <strong>Mails</strong>
-          <span>Er gaat nog niets naar deelnemers. Eerst controleer en keur je de matches goed in stap 3.</span>
+          <span>Er gaat nog niets naar deelnemers. Eerst controleer, schuif en keur je de matches hieronder goed.</span>
         </div>
       </div>
 
@@ -752,59 +765,41 @@ function StepTwo({
         </div>
         <RoundsAccordion adminKey={adminKey} matches={matches} rounds={rounds} usingDemoData={usingDemoData} />
       </div>
-    </StepShell>
-  );
-}
 
-function StepThree({
-  adminKey,
-  draftReviewMatches,
-  participants,
-  reviewMatches,
-  reviewRound,
-  showSheet,
-  usingDemoData
-}: {
-  adminKey: string;
-  draftReviewMatches: MatchWithPeople[];
-  participants: Participant[];
-  reviewMatches: MatchWithPeople[];
-  reviewRound: RoundWithMatches | undefined;
-  showSheet: boolean;
-  usingDemoData: boolean;
-}) {
-  return (
-    <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 3" title="Matches goedkeuren">
-      <div className="section-header match-review-header">
-        <div>
-          <span className="review-month">{reviewRound ? displayMonth(reviewRound.month) : "Geen ronde"}</span>
-          <p>
-            Sleep blokjes om verbindingen te wijzigen. Groen betekent dat capaciteit, rol, vorm en admin-blokkades kloppen.
-            Permanente blokkades zet je in de sheet bij <strong>Niet met</strong>; gebruik daar een nummer, naam of e-mail.
-          </p>
+      <div className="nested-panel">
+        <div className="section-header match-review-header">
+          <div>
+            <h2>Matches controleren en goedkeuren</h2>
+            <span className="review-month">{reviewRound ? displayMonth(reviewRound.month) : "Geen ronde"}</span>
+            <p>
+              Sleep blokjes om verbindingen te wijzigen. Groen betekent dat capaciteit, rol, vorm en admin-blokkades
+              kloppen. Permanente blokkades zet je in de sheet bij <strong>Niet met</strong>; gebruik daar een nummer,
+              naam of e-mail.
+            </p>
+          </div>
+          <div className="inline-actions">
+            <a className="button secondary" href={adminHref(adminKey, { step: "planning", sheet: "1" })}>
+              Sheet met aanmeldingen
+            </a>
+            {reviewRound ? (
+              <form action={sendHostInvitesAction}>
+                <input type="hidden" name="adminKey" value={adminKey} />
+                <input type="hidden" name="roundId" value={reviewRound.id} />
+                <button disabled={usingDemoData || draftReviewMatches.length === 0} type="submit">
+                  Goedkeuren + host-mails
+                </button>
+              </form>
+            ) : null}
+          </div>
         </div>
-        <div className="inline-actions">
-          <a className="button secondary" href={adminHref(adminKey, { step: "review", sheet: "1" })}>
-            Sheet met aanmeldingen
-          </a>
-          {reviewRound ? (
-            <form action={sendHostInvitesAction}>
-              <input type="hidden" name="adminKey" value={adminKey} />
-              <input type="hidden" name="roundId" value={reviewRound.id} />
-              <button disabled={usingDemoData || draftReviewMatches.length === 0} type="submit">
-                Goedkeuren + host-mails
-              </button>
-            </form>
-          ) : null}
-        </div>
+
+        <AdminMatchBoard
+          adminKey={adminKey}
+          disabled={usingDemoData}
+          initialMatches={reviewMatches.map(boardMatch)}
+          participants={participants.map(boardRosterParticipant)}
+        />
       </div>
-
-      <AdminMatchBoard
-        adminKey={adminKey}
-        disabled={usingDemoData}
-        initialMatches={reviewMatches.map(boardMatch)}
-        participants={participants.map(boardRosterParticipant)}
-      />
 
       {showSheet ? (
         <div className="nested-panel">
@@ -829,7 +824,7 @@ function StepFour({
   const savedTemplates = new Map(mailTemplates.map((template) => [template.type, template]));
 
   return (
-    <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 4" title="Mails klaarzetten">
+    <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 3" title="Mails klaarzetten">
       <div className="mail-cycle-note">
         <strong>Links staan automatisch klaar.</strong>
         <span>
@@ -913,7 +908,7 @@ function StepFive({
   const savedPlanningLabel = planningHorizonLabel(planningSettings.horizonMonths);
 
   return (
-    <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 5" title="Samenvatting en afronden">
+    <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 4" title="Samenvatting en afronden">
       <div className="summary-cards">
         <div>
           <span>Stap 1</span>
@@ -925,17 +920,19 @@ function StepFive({
         <div>
           <span>Stap 2</span>
           <strong>{rounds.length} ronde(s)</strong>
-          <small>Planning staat op {savedPlanningLabel}; alle rondes blijven uitklapbaar in dit overzicht.</small>
+          <small>
+            Planning staat op {savedPlanningLabel}; {draftReviewMatches.length} conceptmatch(es) wachten op goedkeuring.
+          </small>
         </div>
         <div>
           <span>Stap 3</span>
-          <strong>{matches.length} matches</strong>
-          <small>{draftReviewMatches.length} conceptmatch(es) wachten op goedkeuring.</small>
+          <strong>{adminMailTemplateDefinitions.length} cyclusmails</strong>
+          <small>{emailLogs.length} laatste mail-logregels zichtbaar.</small>
         </div>
         <div>
           <span>Stap 4</span>
-          <strong>{adminMailTemplateDefinitions.length} cyclusmails</strong>
-          <small>{emailLogs.length} laatste mail-logregels zichtbaar.</small>
+          <strong>{matches.length} matches totaal</strong>
+          <small>Controleer de planning en rond af met host-mails.</small>
         </div>
       </div>
 
@@ -944,7 +941,7 @@ function StepFive({
           <strong>Akkoord met deze planning?</strong>
           <p>
             Na goedkeuring krijgen de kokers hun mail. Als deelnemers tussentijds wijzigen, pas je de sheet aan en loop je
-            stap 2 en 3 opnieuw langs.
+            stap 2 opnieuw langs.
           </p>
         </div>
         {reviewRound ? (
@@ -1129,19 +1126,13 @@ export default async function AdminPage({ searchParams }: PageProps) {
         <StepTwo
           adminKey={key}
           defaultMonth={defaultMonth}
-          matches={matches}
-          planningSettings={planningSettings}
-          rounds={rounds}
-          usingDemoData={usingDemoData}
-        />
-      ) : null}
-      {currentStep === "review" ? (
-        <StepThree
-          adminKey={key}
           draftReviewMatches={draftReviewMatches}
+          matches={matches}
           participants={participants}
+          planningSettings={planningSettings}
           reviewMatches={reviewMatches}
           reviewRound={reviewRound}
+          rounds={rounds}
           showSheet={showSheet}
           usingDemoData={usingDemoData}
         />
