@@ -61,6 +61,7 @@ model Participant {
   address          String?
   cannotEatDays    String?
   cannotHostDays   String?
+  adminNoMatch      String?
   communityScope   CommunityScope    @default(BOTH)
   gatheringType    GatheringType     @default(BOTH)
   cookingPlan      String?

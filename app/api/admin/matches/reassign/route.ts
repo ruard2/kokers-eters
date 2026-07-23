@@ -38,6 +38,59 @@ function pairKey(hostId: string, eaterId: string) {
   return `${hostId}:${eaterId}`;
 }
 
+function compatibleChoice(hostValue: string, eaterValue: string) {
+  return hostValue === "BOTH" || eaterValue === "BOTH" || hostValue === eaterValue;
+}
+
+function noMatchTokens(value: string | null) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(/[\n,;]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+function buildAdminNoMatchMap(participants: Participant[]) {
+  const byEmail = new Map(participants.map((participant) => [participant.email.toLowerCase(), participant.id]));
+  const byName = new Map(participants.map((participant) => [participant.name.toLowerCase(), participant.id]));
+  const byId = new Map(participants.map((participant) => [participant.id, participant.id]));
+  const blocked = new Map<string, Set<string>>();
+
+  for (const participant of participants) {
+    const blockedIds = new Set<string>();
+
+    for (const rawToken of noMatchTokens(participant.adminNoMatch)) {
+      const normalizedToken = rawToken.toLowerCase().replace(/^#/, "");
+      const rowNumber = Number.parseInt(normalizedToken, 10);
+
+      if (/^\d+$/.test(normalizedToken) && participants[rowNumber - 1]) {
+        blockedIds.add(participants[rowNumber - 1].id);
+        continue;
+      }
+
+      const matchedId =
+        byEmail.get(rawToken.toLowerCase()) || byName.get(rawToken.toLowerCase()) || byId.get(rawToken) || null;
+      if (matchedId) {
+        blockedIds.add(matchedId);
+      }
+    }
+
+    blockedIds.delete(participant.id);
+    if (blockedIds.size > 0) {
+      blocked.set(participant.id, blockedIds);
+    }
+  }
+
+  return blocked;
+}
+
+function adminBlocksMatch(host: Participant, eater: Participant, blocked: Map<string, Set<string>>) {
+  return Boolean(blocked.get(host.id)?.has(eater.id) || blocked.get(eater.id)?.has(host.id));
+}
+
 function serializeParticipant(participant: Participant) {
   return {
     id: participant.id,
@@ -48,6 +101,9 @@ function serializeParticipant(participant: Participant) {
     hostCapacity: participant.hostCapacity,
     allergies: participant.allergies,
     address: participant.address,
+    cannotEatDays: participant.cannotEatDays,
+    cannotHostDays: participant.cannotHostDays,
+    adminNoMatch: participant.adminNoMatch,
     cookingPlan: participant.cookingPlan,
     communityScope: participant.communityScope,
     gatheringType: participant.gatheringType
@@ -69,6 +125,7 @@ function validateConnection(input: {
   host: Participant | undefined;
   eater: Participant | undefined;
   partySize: number;
+  adminNoMatch: Map<string, Set<string>>;
 }) {
   if (!input.host || !input.eater) {
     return "Deelnemer niet gevonden.";
@@ -80,6 +137,18 @@ function validateConnection(input: {
 
   if (!input.host.hostCapacity || input.host.hostCapacity < input.partySize) {
     return `${input.host.name} kan deze groep niet ontvangen.`;
+  }
+
+  if (!compatibleChoice(input.host.communityScope, input.eater.communityScope)) {
+    return `${input.host.name} en ${input.eater.name} hebben een andere kring-keuze.`;
+  }
+
+  if (!compatibleChoice(input.host.gatheringType, input.eater.gatheringType)) {
+    return `${input.host.name} en ${input.eater.name} hebben een andere vorm-keuze.`;
+  }
+
+  if (adminBlocksMatch(input.host, input.eater, input.adminNoMatch)) {
+    return `${input.host.name} en ${input.eater.name} mogen niet samen gematcht worden.`;
   }
 
   return null;
@@ -134,6 +203,7 @@ export async function POST(request: Request) {
     where: { id: { in: [body.sourceMatchId, body.targetMatchId] } },
     include: matchInclude
   });
+  const adminNoMatch = buildAdminNoMatchMap(await prisma.participant.findMany({ orderBy: { createdAt: "asc" } }));
 
   if (selectedMatches.length !== 2) {
     return badRequest("Match niet gevonden.", 404);
@@ -187,7 +257,8 @@ export async function POST(request: Request) {
   const sourceError = validateConnection({
     host: participants.get(nextSource.hostId),
     eater: participants.get(nextSource.eaterId),
-    partySize: nextSource.partySize
+    partySize: nextSource.partySize,
+    adminNoMatch
   });
   if (sourceError) {
     return badRequest(sourceError);
@@ -196,7 +267,8 @@ export async function POST(request: Request) {
   const targetError = validateConnection({
     host: participants.get(nextTarget.hostId),
     eater: participants.get(nextTarget.eaterId),
-    partySize: nextTarget.partySize
+    partySize: nextTarget.partySize,
+    adminNoMatch
   });
   if (targetError) {
     return badRequest(targetError);

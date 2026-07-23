@@ -27,6 +27,7 @@ type DemoParticipant = {
   address?: string;
   cannotEatDays?: string;
   cannotHostDays?: string;
+  adminNoMatch?: string;
   allergies?: string;
   cookingPlan?: string;
 };

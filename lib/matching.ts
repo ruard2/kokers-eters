@@ -30,6 +30,66 @@ function canHost(mode: ParticipationMode) {
   return mode === ParticipationMode.HOST || mode === ParticipationMode.BOTH;
 }
 
+function compatibleChoice(hostValue: string, eaterValue: string) {
+  return hostValue === "BOTH" || eaterValue === "BOTH" || hostValue === eaterValue;
+}
+
+function compatibleMatch(host: Participant, eater: Participant) {
+  return (
+    compatibleChoice(host.communityScope, eater.communityScope) &&
+    compatibleChoice(host.gatheringType, eater.gatheringType)
+  );
+}
+
+function noMatchTokens(value: string | null) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(/[\n,;]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+function buildAdminNoMatchMap(participants: Participant[]) {
+  const byEmail = new Map(participants.map((participant) => [participant.email.toLowerCase(), participant.id]));
+  const byName = new Map(participants.map((participant) => [participant.name.toLowerCase(), participant.id]));
+  const byId = new Map(participants.map((participant) => [participant.id, participant.id]));
+  const blocked = new Map<string, Set<string>>();
+
+  for (const participant of participants) {
+    const blockedIds = new Set<string>();
+
+    for (const rawToken of noMatchTokens(participant.adminNoMatch)) {
+      const token = rawToken.toLowerCase().replace(/^#/, "");
+      const rowNumber = Number.parseInt(token, 10);
+
+      if (/^\d+$/.test(token) && participants[rowNumber - 1]) {
+        blockedIds.add(participants[rowNumber - 1].id);
+        continue;
+      }
+
+      const matchedId =
+        byEmail.get(rawToken.toLowerCase()) || byName.get(rawToken.toLowerCase()) || byId.get(rawToken) || null;
+      if (matchedId) {
+        blockedIds.add(matchedId);
+      }
+    }
+
+    blockedIds.delete(participant.id);
+    if (blockedIds.size > 0) {
+      blocked.set(participant.id, blockedIds);
+    }
+  }
+
+  return blocked;
+}
+
+function adminBlocksMatch(host: Participant, eater: Participant, blocked: Map<string, Set<string>>) {
+  return Boolean(blocked.get(host.id)?.has(eater.id) || blocked.get(eater.id)?.has(host.id));
+}
+
 function desiredCount(frequency: Frequency | null, participantCreatedAt: Date, month: Date) {
   if (!frequency) {
     return 0;
@@ -93,6 +153,7 @@ export async function generateRoundForMonth(rawMonth: Date) {
     },
     orderBy: { createdAt: "asc" }
   });
+  const adminNoMatch = buildAdminNoMatchMap(participants);
 
   const priorMatches = await prisma.mealMatch.findMany({
     where: {
@@ -161,6 +222,8 @@ export async function generateRoundForMonth(rawMonth: Date) {
       return (
         bucket.host.id !== request.eater.id &&
         bucket.remainingCapacity >= request.partySize &&
+        compatibleMatch(bucket.host, request.eater) &&
+        !adminBlocksMatch(bucket.host, request.eater, adminNoMatch) &&
         !currentPairs.has(key)
       );
     });

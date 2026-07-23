@@ -4,10 +4,11 @@ import {
   generateMonthlyRoundAction,
   runJobsAction,
   seedDemoAction,
+  saveAdminParticipantAction,
   sendHostInvitesAction,
   sendPreferenceChecksAction
 } from "@/app/actions";
-import { AdminMatchBoard, type BoardMatch } from "@/components/AdminMatchBoard";
+import { AdminMatchBoard, type BoardMatch, type BoardRosterParticipant } from "@/components/AdminMatchBoard";
 import { demoSeedEnabled, isAdminKey } from "@/lib/admin";
 import { displayDate, displayMonth, jsonDateList, monthInputValue, toMonthStart } from "@/lib/dates";
 import { demoAdminData } from "@/lib/demo-data";
@@ -64,6 +65,9 @@ type AdminParticipantLike = {
   hostCapacity: number | null;
   allergies: string | null;
   address: string | null;
+  cannotEatDays: string | null;
+  cannotHostDays: string | null;
+  adminNoMatch: string | null;
   cookingPlan: string | null;
   communityScope: string;
   gatheringType: string;
@@ -89,9 +93,21 @@ function boardParticipant(participant: AdminParticipantLike) {
     hostCapacity: participant.hostCapacity,
     allergies: participant.allergies,
     address: participant.address,
+    cannotEatDays: participant.cannotEatDays,
+    cannotHostDays: participant.cannotHostDays,
+    adminNoMatch: participant.adminNoMatch,
     cookingPlan: participant.cookingPlan,
     communityScope: participant.communityScope,
     gatheringType: participant.gatheringType
+  };
+}
+
+function boardRosterParticipant(participant: AdminParticipantLike): BoardRosterParticipant {
+  return {
+    id: participant.id,
+    name: participant.name,
+    email: participant.email,
+    adminNoMatch: participant.adminNoMatch
   };
 }
 
@@ -137,7 +153,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
 
   try {
     [participants, rounds, matches, emailLogs] = await Promise.all([
-      prisma.participant.findMany({ orderBy: { createdAt: "desc" }, take: 80 }),
+      prisma.participant.findMany({ orderBy: { createdAt: "asc" }, take: 120 }),
       prisma.matchRound.findMany({ orderBy: { month: "desc" }, take: 12, include: { matches: true } }),
       prisma.mealMatch.findMany({
         orderBy: { createdAt: "desc" },
@@ -256,7 +272,12 @@ export default async function AdminPage({ searchParams }: PageProps) {
             </form>
           ) : null}
         </div>
-        <AdminMatchBoard adminKey={key} disabled={usingDemoData} initialMatches={reviewMatches.map(boardMatch)} />
+        <AdminMatchBoard
+          adminKey={key}
+          disabled={usingDemoData}
+          initialMatches={reviewMatches.map(boardMatch)}
+          participants={participants.map(boardRosterParticipant)}
+        />
       </section>
 
       <section className="panel worksheet-panel">
@@ -437,36 +458,88 @@ export default async function AdminPage({ searchParams }: PageProps) {
         <div className="section-header">
           <h2>Deelnemers</h2>
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Naam</th>
-                <th>Mail</th>
-                <th>Rol</th>
-                <th>Komt met</th>
-                <th>Ontvangt</th>
-                <th>Actief</th>
-              </tr>
-            </thead>
-            <tbody>
-              {participants.map((participant) => (
-                <tr key={participant.id}>
-                  <td>{participant.name}</td>
-                  <td>{participant.email}</td>
-                  <td>{participant.mode}</td>
-                  <td>{participant.comingWithCount}</td>
-                  <td>{participant.hostCapacity || "-"}</td>
-                  <td>{participant.active ? "Ja" : "Nee"}</td>
-                </tr>
-              ))}
-              {participants.length === 0 ? (
-                <tr>
-                  <td colSpan={6}>Nog geen deelnemers.</td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+        <div className="participant-sheet">
+          <div className="participant-sheet-head">
+            <span>#</span>
+            <span>Naam</span>
+            <span>E-mail</span>
+            <span>WhatsApp</span>
+            <span>Rol</span>
+            <span>Komt</span>
+            <span>Ontvangt</span>
+            <span>Niet met</span>
+            <span>Actief</span>
+            <span>Actie</span>
+          </div>
+
+          <form action={saveAdminParticipantAction} className="participant-sheet-row new-row">
+            <input type="hidden" name="adminKey" value={key} />
+            <span className="sheet-number">Nieuw</span>
+            <input aria-label="Nieuwe naam" disabled={usingDemoData} name="name" placeholder="Gezin / naam" />
+            <input aria-label="Nieuwe e-mail" disabled={usingDemoData} name="email" placeholder="mail@example.nl" />
+            <input aria-label="Nieuw WhatsAppnummer" disabled={usingDemoData} name="whatsapp" placeholder="06..." />
+            <select aria-label="Nieuwe rol" defaultValue="BOTH" disabled={usingDemoData} name="mode">
+              <option value="BOTH">Allebei</option>
+              <option value="EAT">Eten</option>
+              <option value="HOST">Koken</option>
+            </select>
+            <input aria-label="Nieuwe groepgrootte" defaultValue={1} disabled={usingDemoData} min={1} name="comingWithCount" type="number" />
+            <input aria-label="Nieuwe ontvangstcapaciteit" defaultValue={4} disabled={usingDemoData} min={1} name="hostCapacity" type="number" />
+            <input aria-label="Nieuwe niet met" disabled={usingDemoData} name="adminNoMatch" placeholder="#3, naam of e-mail" />
+            <label className="sheet-check">
+              <input defaultChecked disabled={usingDemoData} name="active" type="checkbox" />
+            </label>
+            <button className="small" disabled={usingDemoData} type="submit">
+              Voeg toe
+            </button>
+          </form>
+
+          {participants.map((participant, index) => (
+            <form action={saveAdminParticipantAction} className="participant-sheet-row" key={participant.id}>
+              <input type="hidden" name="adminKey" value={key} />
+              <input type="hidden" name="participantId" value={participant.id} />
+              <span className="sheet-number">{index + 1}</span>
+              <input aria-label={`Naam ${participant.name}`} defaultValue={participant.name} disabled={usingDemoData} name="name" />
+              <input aria-label={`E-mail ${participant.name}`} defaultValue={participant.email} disabled={usingDemoData} name="email" />
+              <input aria-label={`WhatsApp ${participant.name}`} defaultValue={participant.whatsapp} disabled={usingDemoData} name="whatsapp" />
+              <select aria-label={`Rol ${participant.name}`} defaultValue={participant.mode} disabled={usingDemoData} name="mode">
+                <option value="BOTH">Allebei</option>
+                <option value="EAT">Eten</option>
+                <option value="HOST">Koken</option>
+              </select>
+              <input
+                aria-label={`Groepgrootte ${participant.name}`}
+                defaultValue={participant.comingWithCount}
+                disabled={usingDemoData}
+                min={1}
+                name="comingWithCount"
+                type="number"
+              />
+              <input
+                aria-label={`Ontvangstcapaciteit ${participant.name}`}
+                defaultValue={participant.hostCapacity || ""}
+                disabled={usingDemoData}
+                min={1}
+                name="hostCapacity"
+                type="number"
+              />
+              <input
+                aria-label={`Niet met ${participant.name}`}
+                defaultValue={participant.adminNoMatch || ""}
+                disabled={usingDemoData}
+                name="adminNoMatch"
+                placeholder="#3, #8"
+              />
+              <label className="sheet-check">
+                <input defaultChecked={participant.active} disabled={usingDemoData} name="active" type="checkbox" />
+              </label>
+              <button className="small secondary" disabled={usingDemoData} type="submit">
+                Bewaar
+              </button>
+            </form>
+          ))}
+
+          {participants.length === 0 ? <div className="board-empty">Nog geen deelnemers.</div> : null}
         </div>
       </section>
 

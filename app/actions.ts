@@ -1,6 +1,6 @@
 "use server";
 
-import { MatchStatus, ParticipationMode } from "@prisma/client";
+import { CommunityScope, Frequency, GatheringType, MatchStatus, ParticipationMode } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { demoSeedEnabled, isAdminKey } from "@/lib/admin";
 import { runDueJobs, sendHostInvitesForRound, sendPreferenceChecksForMonth } from "@/lib/automation";
@@ -81,6 +81,25 @@ function redirectAdmin(key: string, notice: string) {
 function databaseUnavailableNotice(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("Can't reach database server") || message.includes("PrismaClientInitializationError");
+}
+
+function adminParticipantData(formData: FormData, existing?: { eaterFrequency: Frequency | null; hostFrequency: Frequency | null }) {
+  const mode = participationMode(formData);
+  const eat = wantsToEat(mode);
+  const host = wantsToHost(mode);
+
+  return {
+    name: text(formData, "name"),
+    email: normalizeEmail(text(formData, "email")),
+    whatsapp: text(formData, "whatsapp"),
+    mode,
+    comingWithCount: eat ? intValue(formData, "comingWithCount", 1) : 1,
+    hostCapacity: host ? intValue(formData, "hostCapacity", 1) : null,
+    eaterFrequency: eat ? existing?.eaterFrequency || Frequency.MONTHLY : null,
+    hostFrequency: host ? existing?.hostFrequency || Frequency.MONTHLY : null,
+    adminNoMatch: optionalText(formData, "adminNoMatch"),
+    active: formData.get("active") === "on"
+  };
 }
 
 export async function registerParticipant(formData: FormData) {
@@ -297,6 +316,59 @@ export async function runJobsAction(formData: FormData) {
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
       redirectAdmin(key, "Database niet bereikbaar. Automatische jobs kunnen pas met een echte database.");
+    }
+
+    throw error;
+  }
+}
+
+export async function saveAdminParticipantAction(formData: FormData) {
+  const key = requireAdmin(formData);
+  const participantId = text(formData, "participantId");
+
+  try {
+    const existing = participantId
+      ? await prisma.participant.findUnique({
+          where: { id: participantId },
+          select: { eaterFrequency: true, hostFrequency: true }
+        })
+      : null;
+
+    if (participantId && !existing) {
+      redirectAdmin(key, "Deelnemer niet gevonden.");
+    }
+
+    const data = adminParticipantData(formData, existing || undefined);
+    if (!data.name || !data.email || !data.whatsapp) {
+      redirectAdmin(key, "Naam, e-mail en WhatsApp zijn verplicht.");
+    }
+
+    if (participantId) {
+      await prisma.participant.update({
+        where: { id: participantId },
+        data
+      });
+      redirectAdmin(key, `${data.name} bijgewerkt.`);
+    }
+
+    await prisma.participant.create({
+      data: {
+        ...data,
+        active: true,
+        allergies: null,
+        address: null,
+        cannotEatDays: null,
+        cannotHostDays: null,
+        communityScope: CommunityScope.BOTH,
+        gatheringType: GatheringType.BOTH,
+        cookingPlan: null,
+        preferenceToken: createToken()
+      }
+    });
+    redirectAdmin(key, `${data.name} toegevoegd.`);
+  } catch (error) {
+    if (databaseUnavailableNotice(error)) {
+      redirectAdmin(key, "Database niet bereikbaar. Deelnemers bewerken kan pas met een echte database.");
     }
 
     throw error;
