@@ -139,10 +139,6 @@ function validateConnection(input: {
     return `${input.host.name} kan deze groep niet ontvangen.`;
   }
 
-  if (!compatibleChoice(input.host.communityScope, input.eater.communityScope)) {
-    return `${input.host.name} en ${input.eater.name} hebben een andere kring-keuze.`;
-  }
-
   if (!compatibleChoice(input.host.gatheringType, input.eater.gatheringType)) {
     return `${input.host.name} en ${input.eater.name} hebben een andere vorm-keuze.`;
   }

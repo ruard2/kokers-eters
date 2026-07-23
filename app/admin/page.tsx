@@ -74,10 +74,8 @@ function modeLabel(value: string) {
   return "Allebei";
 }
 
-function scopeLabel(value: string) {
-  if (value === "COMMUNITY_WIDE") return "Gemeentebreed";
-  if (value === "GUESTS_AND_NEWCOMERS") return "Gasten/nieuwkomers";
-  return "Allebei";
+function participantKindLabel(isGuest: boolean) {
+  return isGuest ? "Gast" : "Gemeentelid";
 }
 
 function gatheringLabel(value: string) {
@@ -238,6 +236,7 @@ function ParticipantSheet({
         <span>Naam</span>
         <span>E-mail</span>
         <span>WhatsApp</span>
+        <span>Wat ben je</span>
         <span>Rol</span>
         <span>Komt</span>
         <span>Ontvangt</span>
@@ -252,6 +251,10 @@ function ParticipantSheet({
         <input aria-label="Nieuwe naam" disabled={usingDemoData} name="name" placeholder="Gezin / naam" />
         <input aria-label="Nieuwe e-mail" disabled={usingDemoData} name="email" placeholder="mail@example.nl" />
         <input aria-label="Nieuw WhatsAppnummer" disabled={usingDemoData} name="whatsapp" placeholder="06..." />
+        <label className="sheet-check sheet-check-text">
+          <input disabled={usingDemoData} name="isGuest" type="checkbox" />
+          <span>Gast</span>
+        </label>
         <select aria-label="Nieuwe rol" defaultValue="BOTH" disabled={usingDemoData} name="mode">
           <option value="BOTH">Allebei</option>
           <option value="EAT">Eten</option>
@@ -300,6 +303,10 @@ function ParticipantSheet({
             disabled={usingDemoData}
             name="whatsapp"
           />
+          <label className="sheet-check sheet-check-text">
+            <input defaultChecked={participant.isGuest} disabled={usingDemoData} name="isGuest" type="checkbox" />
+            <span>Gast</span>
+          </label>
           <select aria-label={`Rol ${participant.name}`} defaultValue={participant.mode} disabled={usingDemoData} name="mode">
             <option value="BOTH">Allebei</option>
             <option value="EAT">Eten</option>
@@ -357,7 +364,7 @@ function Worksheet({ matches }: { matches: MatchWithPeople[] }) {
             <th>Eter</th>
             <th>Eter contact</th>
             <th>Groep</th>
-            <th>Kring</th>
+            <th>Wat ben je</th>
             <th>Vorm</th>
             <th>Allergie/dieet</th>
             <th>Voorgestelde dagen</th>
@@ -396,7 +403,7 @@ function Worksheet({ matches }: { matches: MatchWithPeople[] }) {
                   <span className="cell-muted">{match.eater.whatsapp}</span>
                 </td>
                 <td>{match.partySize}</td>
-                <td>{scopeLabel(match.eater.communityScope)}</td>
+                <td>{participantKindLabel(match.eater.isGuest)}</td>
                 <td>{gatheringLabel(match.eater.gatheringType)}</td>
                 <td>{match.eater.allergies || "-"}</td>
                 <td>
@@ -704,8 +711,7 @@ function StepThree({
         <div>
           <span className="review-month">{reviewRound ? displayMonth(reviewRound.month) : "Geen ronde"}</span>
           <p>
-            Sleep blokjes om verbindingen te wijzigen. Groen betekent dat capaciteit, rol, kring, vorm en admin-blokkades
-            kloppen.
+            Sleep blokjes om verbindingen te wijzigen. Groen betekent dat capaciteit, rol, vorm en admin-blokkades kloppen.
           </p>
         </div>
         <div className="inline-actions">
@@ -818,6 +824,8 @@ function StepFive({
   const activeParticipants = participants.filter((participant) => participant.active);
   const hostCount = activeParticipants.filter((participant) => participant.mode !== "EAT").length;
   const eaterCount = activeParticipants.filter((participant) => participant.mode !== "HOST").length;
+  const guestCount = activeParticipants.filter((participant) => participant.isGuest).length;
+  const memberCount = activeParticipants.length - guestCount;
   const savedPlanningLabel =
     planningSettings.horizonMonths === 12 ? "jaar" : planningSettings.horizonMonths === 3 ? "kwartaal" : "ronde";
 
@@ -828,7 +836,7 @@ function StepFive({
           <span>Stap 1</span>
           <strong>{activeParticipants.length} actieve deelnemers</strong>
           <small>
-            {hostCount} kunnen ontvangen, {eaterCount} kunnen eten.
+            {hostCount} kunnen ontvangen, {eaterCount} kunnen eten. {memberCount} gemeentelid, {guestCount} gast.
           </small>
         </div>
         <div>

@@ -60,12 +60,6 @@ function modeLabel(value: string) {
   return "Allebei";
 }
 
-function scopeLabel(value: string) {
-  if (value === "COMMUNITY_WIDE") return "Gemeentebreed";
-  if (value === "GUESTS_AND_NEWCOMERS") return "Gasten/nieuwkomers";
-  return "Allebei";
-}
-
 function gatheringLabel(value: string) {
   if (value === "MEAL") return "Maaltijd";
   if (value === "COFFEE_TEA") return "Koffie/thee";
@@ -169,10 +163,6 @@ function validateConnection(match: BoardMatch, adminNoMatch: Map<string, Set<str
 
   if (!match.host.hostCapacity || match.host.hostCapacity < match.partySize) {
     return `${match.host.name} heeft ${match.host.hostCapacity || 0} plekken, groep is ${match.partySize}.`;
-  }
-
-  if (!compatibleChoice(match.host.communityScope, match.eater.communityScope)) {
-    return `${match.host.name} en ${match.eater.name} hebben een andere kring-keuze.`;
   }
 
   if (!compatibleChoice(match.host.gatheringType, match.eater.gatheringType)) {
@@ -350,11 +340,7 @@ function ParticipantTile({
       ) : (
         <>
           <span className="tile-meta">{match.partySize} persoon/personen</span>
-          {!simple ? (
-            <span className="tile-meta">
-              {scopeLabel(participant.communityScope)} - {gatheringLabel(participant.gatheringType)}
-            </span>
-          ) : null}
+          {!simple ? <span className="tile-meta">{gatheringLabel(participant.gatheringType)}</span> : null}
           {!simple && participant.allergies ? <span className="tile-extra">{participant.allergies}</span> : null}
         </>
       )}

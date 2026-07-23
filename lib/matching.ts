@@ -58,10 +58,7 @@ function compatibleChoice(hostValue: string, eaterValue: string) {
 }
 
 function compatibleMatch(host: Participant, eater: Participant) {
-  return (
-    compatibleChoice(host.communityScope, eater.communityScope) &&
-    compatibleChoice(host.gatheringType, eater.gatheringType)
-  );
+  return compatibleChoice(host.gatheringType, eater.gatheringType);
 }
 
 function noMatchTokens(value: string | null) {

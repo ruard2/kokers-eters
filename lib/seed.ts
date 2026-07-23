@@ -28,6 +28,7 @@ type DemoParticipant = {
   cannotEatDays?: string;
   cannotHostDays?: string;
   adminNoMatch?: string;
+  isGuest?: boolean;
   allergies?: string;
   cookingPlan?: string;
 };
@@ -362,6 +363,8 @@ export async function seedDemoData(): Promise<SeedResult> {
     await prisma.participant.create({
       data: {
         ...participant,
+        isGuest: participant.isGuest ?? participant.communityScope === CommunityScope.GUESTS_AND_NEWCOMERS,
+        communityScope: CommunityScope.COMMUNITY_WIDE,
         preferenceToken: createToken(),
         active: true
       }

@@ -1,5 +1,4 @@
 import {
-  CommunityScope,
   Frequency,
   GatheringType,
   ParticipationMode,
@@ -19,7 +18,6 @@ function value(participant: Participant | undefined, key: keyof Participant, fal
 
 export function ParticipantFormFields({ participant, showActive = false }: Props) {
   const mode = participant?.mode || ParticipationMode.BOTH;
-  const communityScope = participant?.communityScope || CommunityScope.BOTH;
   const gatheringType = participant?.gatheringType || GatheringType.BOTH;
 
   return (
@@ -63,39 +61,6 @@ export function ParticipantFormFields({ participant, showActive = false }: Props
           <label>
             WhatsAppnummer
             <input name="whatsapp" required defaultValue={value(participant, "whatsapp")} />
-          </label>
-        </div>
-      </section>
-
-      <section className="form-section wide">
-        <h2>Kring</h2>
-        <div className="choice-grid">
-          <label>
-            <input
-              name="communityScope"
-              type="radio"
-              value={CommunityScope.COMMUNITY_WIDE}
-              defaultChecked={communityScope === CommunityScope.COMMUNITY_WIDE}
-            />
-            <span>Gemeentebreed</span>
-          </label>
-          <label>
-            <input
-              name="communityScope"
-              type="radio"
-              value={CommunityScope.GUESTS_AND_NEWCOMERS}
-              defaultChecked={communityScope === CommunityScope.GUESTS_AND_NEWCOMERS}
-            />
-            <span>Gasten en nieuwkomers</span>
-          </label>
-          <label>
-            <input
-              name="communityScope"
-              type="radio"
-              value={CommunityScope.BOTH}
-              defaultChecked={communityScope === CommunityScope.BOTH}
-            />
-            <span>Allebei</span>
           </label>
         </div>
       </section>

@@ -6,7 +6,6 @@ import { demoSeedEnabled, isAdminKey } from "@/lib/admin";
 import { runDueJobs, sendHostInvitesForRound, sendPreferenceChecksForMonth } from "@/lib/automation";
 import { addMonths, dateInputToDate, jsonDateList, parseMonthInput } from "@/lib/dates";
 import {
-  communityScope,
   frequency,
   gatheringType,
   intValue,
@@ -61,9 +60,9 @@ function participantFormData(formData: FormData, active: boolean) {
     address: host ? optionalText(formData, "address") : null,
     cannotEatDays: eat ? optionalText(formData, "cannotEatDays") : null,
     cannotHostDays: host ? optionalText(formData, "cannotHostDays") : null,
-    communityScope: communityScope(formData),
+    communityScope: CommunityScope.COMMUNITY_WIDE,
     gatheringType: gatheringType(formData),
-    cookingPlan: host ? optionalText(formData, "cookingPlan") : null,
+    cookingPlan: null,
     active
   };
 }
@@ -114,6 +113,8 @@ function adminParticipantData(formData: FormData, existing?: { eaterFrequency: F
     eaterFrequency: eat ? existing?.eaterFrequency || Frequency.MONTHLY : null,
     hostFrequency: host ? existing?.hostFrequency || Frequency.MONTHLY : null,
     adminNoMatch: optionalText(formData, "adminNoMatch"),
+    isGuest: formData.get("isGuest") === "on",
+    communityScope: CommunityScope.COMMUNITY_WIDE,
     active: formData.get("active") === "on"
   };
 }
@@ -477,7 +478,7 @@ export async function saveAdminParticipantAction(formData: FormData) {
         address: null,
         cannotEatDays: null,
         cannotHostDays: null,
-        communityScope: CommunityScope.BOTH,
+        communityScope: CommunityScope.COMMUNITY_WIDE,
         gatheringType: GatheringType.BOTH,
         cookingPlan: null,
         preferenceToken: createToken()

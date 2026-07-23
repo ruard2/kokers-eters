@@ -69,6 +69,14 @@ function participantValue(value: unknown) {
   return String(value);
 }
 
+function participantFieldValue(key: keyof Participant, value: unknown) {
+  if (key === "isGuest") {
+    return value ? "Gast" : "Gemeentelid";
+  }
+
+  return participantValue(value);
+}
+
 function participantChanges(previous: Participant | null | undefined, next: Participant) {
   if (!previous) {
     return "Nieuwe aanmelding.";
@@ -87,14 +95,14 @@ function participantChanges(previous: Participant | null | undefined, next: Part
     ["address", "Adres"],
     ["cannotEatDays", "Kan niet eten"],
     ["cannotHostDays", "Kan niet koken"],
-    ["communityScope", "Kring"],
+    ["isGuest", "Wat ben je"],
     ["gatheringType", "Vorm"],
     ["active", "Actief"]
   ];
 
   const changes = fields
-    .filter(([key]) => participantValue(previous[key]) !== participantValue(next[key]))
-    .map(([key, label]) => `${label}: ${participantValue(previous[key])} -> ${participantValue(next[key])}`);
+    .filter(([key]) => participantFieldValue(key, previous[key]) !== participantFieldValue(key, next[key]))
+    .map(([key, label]) => `${label}: ${participantFieldValue(key, previous[key])} -> ${participantFieldValue(key, next[key])}`);
 
   return changes.length > 0 ? changes.join("\n") : "Geen inhoudelijke wijziging gevonden.";
 }

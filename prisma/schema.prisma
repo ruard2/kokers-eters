@@ -62,7 +62,8 @@ model Participant {
   cannotEatDays    String?
   cannotHostDays   String?
   adminNoMatch      String?
-  communityScope   CommunityScope    @default(BOTH)
+  isGuest           Boolean           @default(false)
+  communityScope   CommunityScope    @default(COMMUNITY_WIDE)
   gatheringType    GatheringType     @default(BOTH)
   cookingPlan      String?
   active           Boolean           @default(true)
