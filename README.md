@@ -73,7 +73,7 @@ Zet daarna deze variabelen op de app-service:
 - `EMAIL_FROM`
 - `AUTO_GENERATE_ROUNDS`
 - `AUTO_SEND_ROUNDS`
-- optioneel: `REQUIRE_DATABASE_MIGRATIONS`
+- optioneel: `FAIL_DEPLOY_ON_MIGRATION_ERROR`
 
 Gebruik de `DATABASE_URL` van Railway PostgreSQL. `APP_URL` moet de publieke Railway URL van de app zijn, bijvoorbeeld `https://kokers-eters-production.up.railway.app`. Als je per ongeluk alleen `kokers-eters-production.up.railway.app` invult, zet de app er zelf `https://` voor.
 `ADMIN_EMAIL` krijgt meldingen over nieuwe of gewijzigde aanmeldingen en reminders om nieuwe rondes klaar te zetten.
@@ -93,7 +93,7 @@ Twee geldige configuraties:
 
 Als deze twee getallen niet gelijk zijn, geeft de publieke URL `502` terwijl de deploy en healthcheck groen zijn (de healthcheck test op de door Railway geïnjecteerde poort, de publieke URL op de domain target port).
 
-De database-migraties draaien in Railway via de pre-deploy stap als `DATABASE_URL` goed staat. Als de database nog niet bereikbaar is, start de app alsnog met de demo/fallback adminweergave. Zet `REQUIRE_DATABASE_MIGRATIONS=true` als een deploy juist moet falen wanneer migraties niet lukken.
+De database-migraties draaien in Railway via de pre-deploy stap als `DATABASE_URL` goed staat. Als de database nog niet bereikbaar is, blokkeert dat normaal niet de deployment. Zet alleen `FAIL_DEPLOY_ON_MIGRATION_ERROR=true` als een deploy juist moet falen wanneer migraties niet lukken.
 
 ### 502 op de publieke URL oplossen
 
