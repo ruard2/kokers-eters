@@ -115,6 +115,11 @@ h2 {
   margin: 0 0 16px;
 }
 
+h3 {
+  font-size: 17px;
+  margin: 0 0 8px;
+}
+
 p {
   color: var(--muted);
   font-size: 17px;
@@ -601,6 +606,16 @@ th {
   margin: 4px 0 8px;
 }
 
+.step-help {
+  background: #fbfcfa;
+  border-left: 4px solid var(--green);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 0;
+  padding: 10px 12px;
+}
+
 .step-card-flat {
   align-content: center;
   border-left: 4px solid var(--green);
@@ -652,28 +667,24 @@ th {
   min-height: 44px;
 }
 
-.step-notes,
-.planning-explainer {
+.step-notes {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.step-notes div,
-.planning-explainer div {
+.step-notes div {
   border-top: 1px solid var(--line);
   display: grid;
   gap: 4px;
   padding-top: 10px;
 }
 
-.step-notes strong,
-.planning-explainer strong {
+.step-notes strong {
   font-size: 13px;
 }
 
-.step-notes span,
-.planning-explainer span {
+.step-notes span {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
@@ -716,6 +727,11 @@ th {
   display: grid;
   gap: 10px;
   padding: 12px 14px 14px;
+}
+
+.round-review {
+  display: grid;
+  gap: 12px;
 }
 
 .round-card-action {
@@ -1372,7 +1388,6 @@ th {
   .planning-form,
   .step-grid,
   .step-notes,
-  .planning-explainer,
   .summary-cards,
   .step-empty,
   .round-match-line {

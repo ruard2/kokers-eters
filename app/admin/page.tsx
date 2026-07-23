@@ -479,11 +479,13 @@ function RoundsTable({ adminKey, rounds, usingDemoData }: { adminKey: string; ro
 function RoundsAccordion({
   adminKey,
   matches,
+  participants,
   rounds,
   usingDemoData
 }: {
   adminKey: string;
   matches: MatchWithPeople[];
+  participants: Participant[];
   rounds: RoundWithMatches[];
   usingDemoData: boolean;
 }) {
@@ -506,6 +508,7 @@ function RoundsAccordion({
         const roundMatches = (matchesByRound.get(round.id) || []).sort(
           (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
         );
+        const draftCount = roundMatches.filter((match) => match.status === "DRAFT").length;
         const matchCount = roundMatches.length || round.matches.length;
 
         return (
@@ -519,26 +522,36 @@ function RoundsAccordion({
               </span>
             </summary>
             <div className="round-card-body">
-              <form action={sendHostInvitesAction} className="round-card-action">
-                <input type="hidden" name="adminKey" value={adminKey} />
-                <input type="hidden" name="roundId" value={round.id} />
-                <button className="small" disabled={usingDemoData || round.status !== "DRAFT"} type="submit">
-                  Goedkeuren + host-mails
-                </button>
-              </form>
               {roundMatches.length > 0 ? (
-                <div className="round-match-list">
-                  {roundMatches.map((match, index) => (
-                    <div className="round-match-line" key={match.id}>
-                      <span>{index + 1}</span>
-                      <strong>{match.host.name}</strong>
-                      <em />
-                      <strong>{match.eater.name}</strong>
-                      <small>
-                        {match.partySize} persoon/personen - {statusLabel(match.status)}
-                      </small>
+                <div className="round-review">
+                  <div className="section-header match-review-header">
+                    <div>
+                      <h3>Matches controleren en goedkeuren</h3>
+                      <p>
+                        De matches zijn automatisch gegenereerd. Sleep blokjes om handmatig aan te passen. Groen betekent
+                        dat capaciteit, rol, vorm en admin-blokkades kloppen. Permanente blokkades zet je in de sheet bij{" "}
+                        <strong>Niet met</strong>.
+                      </p>
                     </div>
-                  ))}
+                    <div className="inline-actions">
+                      <a className="button secondary" href={adminHref(adminKey, { step: "planning", sheet: "1" })}>
+                        Sheet met aanmeldingen
+                      </a>
+                      <form action={sendHostInvitesAction}>
+                        <input type="hidden" name="adminKey" value={adminKey} />
+                        <input type="hidden" name="roundId" value={round.id} />
+                        <button disabled={usingDemoData || draftCount === 0} type="submit">
+                          Goedkeuren + host-mails
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                  <AdminMatchBoard
+                    adminKey={adminKey}
+                    disabled={usingDemoData}
+                    initialMatches={roundMatches.map(boardMatch)}
+                    participants={participants.map(boardRosterParticipant)}
+                  />
                 </div>
               ) : (
                 <p className="compact-muted">Nog geen matchdetails voor deze ronde.</p>
@@ -682,31 +695,25 @@ function StepOne({
 function StepTwo({
   adminKey,
   defaultMonth,
-  draftReviewMatches,
   matches,
   participants,
   planningSettings,
-  reviewMatches,
-  reviewRound,
   rounds,
   showSheet,
   usingDemoData
 }: {
   adminKey: string;
   defaultMonth: string;
-  draftReviewMatches: MatchWithPeople[];
   matches: MatchWithPeople[];
   participants: Participant[];
   planningSettings: PlanningSettingsView;
-  reviewMatches: MatchWithPeople[];
-  reviewRound: RoundWithMatches | undefined;
   rounds: RoundWithMatches[];
   showSheet: boolean;
   usingDemoData: boolean;
 }) {
   return (
     <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 2" title="Rondes en matches klaarzetten">
-      <form action={generatePlanningAction} className="planning-form">
+      <form action={generatePlanningAction} className="planning-form" key={`planning-${planningSettings.horizonMonths}-${defaultMonth}`}>
         <input type="hidden" name="adminKey" value={adminKey} />
         <input type="hidden" name="adminCheckDaysBefore" value={planningSettings.adminCheckDaysBefore} />
         <input type="hidden" name="hostMailDaysBefore" value={planningSettings.hostMailDaysBefore} />
@@ -720,10 +727,10 @@ function StepTwo({
         </label>
         <label>
           Voor hoelang klaarzetten
-          <select defaultValue={planningSettings.horizonMonths} name="horizonMonths">
-            <option value={1}>Een ronde</option>
-            <option value={3}>Kwartaal</option>
-            <option value={12}>Jaar</option>
+          <select defaultValue={String(planningSettings.horizonMonths)} name="horizonMonths">
+            <option value="1">Een ronde</option>
+            <option value="3">Kwartaal</option>
+            <option value="12">Jaar</option>
           </select>
           <span className="field-hint">Een ronde is een maand. Een jaar maakt twaalf maandrondes in een keer.</span>
         </label>
@@ -732,72 +739,22 @@ function StepTwo({
         </button>
       </form>
 
-      <div className="planning-explainer">
-        <div>
-          <strong>Wat gebeurt er?</strong>
-          <span>Het systeem maakt conceptmatches met de deelnemers zoals ze nu in de sheet staan.</span>
-        </div>
-        <div>
-          <strong>Frequentie</strong>
-          <span>Eens per twee weken telt als twee plekken binnen een maandronde; eens per kwartaal slaat maanden over.</span>
-        </div>
-        <div>
-          <strong>Mails</strong>
-          <span>Er gaat nog niets naar deelnemers. Eerst controleer, schuif en keur je de matches hieronder goed.</span>
-        </div>
-      </div>
-
-      <form action={sendPreferenceChecksAction} className="inline-form">
-        <input type="hidden" name="adminKey" value={adminKey} />
-        <label>
-          Voorkeursmails voor maand
-          <input name="month" type="month" defaultValue={defaultMonth} />
-        </label>
-        <button className="secondary" disabled={usingDemoData} type="submit">
-          Meedoen-check nu sturen
-        </button>
-      </form>
+      <p className="step-help">
+        Matches worden automatisch gegenereerd met de deelnemers zoals ze nu in de sheet staan. Klik een maand open om de
+        verbindingen te controleren, handmatig te schuiven en goed te keuren.
+      </p>
 
       <div className="nested-panel">
         <div className="section-header">
           <h2>Rondes in de planning</h2>
-          <span className="section-hint">Klik een maand open om de verbindingen te zien.</span>
+          <span className="section-hint">Klik een maand open voor matches, sheet en goedkeuring.</span>
         </div>
-        <RoundsAccordion adminKey={adminKey} matches={matches} rounds={rounds} usingDemoData={usingDemoData} />
-      </div>
-
-      <div className="nested-panel">
-        <div className="section-header match-review-header">
-          <div>
-            <h2>Matches controleren en goedkeuren</h2>
-            <span className="review-month">{reviewRound ? displayMonth(reviewRound.month) : "Geen ronde"}</span>
-            <p>
-              Sleep blokjes om verbindingen te wijzigen. Groen betekent dat capaciteit, rol, vorm en admin-blokkades
-              kloppen. Permanente blokkades zet je in de sheet bij <strong>Niet met</strong>; gebruik daar een nummer,
-              naam of e-mail.
-            </p>
-          </div>
-          <div className="inline-actions">
-            <a className="button secondary" href={adminHref(adminKey, { step: "planning", sheet: "1" })}>
-              Sheet met aanmeldingen
-            </a>
-            {reviewRound ? (
-              <form action={sendHostInvitesAction}>
-                <input type="hidden" name="adminKey" value={adminKey} />
-                <input type="hidden" name="roundId" value={reviewRound.id} />
-                <button disabled={usingDemoData || draftReviewMatches.length === 0} type="submit">
-                  Goedkeuren + host-mails
-                </button>
-              </form>
-            ) : null}
-          </div>
-        </div>
-
-        <AdminMatchBoard
+        <RoundsAccordion
           adminKey={adminKey}
-          disabled={usingDemoData}
-          initialMatches={reviewMatches.map(boardMatch)}
-          participants={participants.map(boardRosterParticipant)}
+          matches={matches}
+          participants={participants}
+          rounds={rounds}
+          usingDemoData={usingDemoData}
         />
       </div>
 
@@ -812,11 +769,13 @@ function StepTwo({
 
 function StepFour({
   adminKey,
+  defaultMonth,
   emailLogs,
   mailTemplates,
   usingDemoData
 }: {
   adminKey: string;
+  defaultMonth: string;
   emailLogs: EmailLog[];
   mailTemplates: MailTemplate[];
   usingDemoData: boolean;
@@ -832,6 +791,16 @@ function StepFour({
           preferencesUrl. Zet een mail uit als je die stap niet wilt gebruiken.
         </span>
       </div>
+      <form action={sendPreferenceChecksAction} className="inline-form">
+        <input type="hidden" name="adminKey" value={adminKey} />
+        <label>
+          Meedoen-check voor maand
+          <input name="month" type="month" defaultValue={defaultMonth} />
+        </label>
+        <button className="secondary" disabled={usingDemoData} type="submit">
+          Meedoen-check nu sturen
+        </button>
+      </form>
       <div className="mail-template-list">
         {adminMailTemplateDefinitions.map((definition) => {
           const saved = savedTemplates.get(definition.type);
@@ -959,7 +928,13 @@ function StepFive({
         <div className="section-header">
           <h2>Gehele planning</h2>
         </div>
-        <RoundsAccordion adminKey={adminKey} matches={matches} rounds={rounds} usingDemoData={usingDemoData} />
+        <RoundsAccordion
+          adminKey={adminKey}
+          matches={matches}
+          participants={participants}
+          rounds={rounds}
+          usingDemoData={usingDemoData}
+        />
       </div>
 
       <div className="nested-panel worksheet-panel">
@@ -1126,19 +1101,22 @@ export default async function AdminPage({ searchParams }: PageProps) {
         <StepTwo
           adminKey={key}
           defaultMonth={defaultMonth}
-          draftReviewMatches={draftReviewMatches}
           matches={matches}
           participants={participants}
           planningSettings={planningSettings}
-          reviewMatches={reviewMatches}
-          reviewRound={reviewRound}
           rounds={rounds}
           showSheet={showSheet}
           usingDemoData={usingDemoData}
         />
       ) : null}
       {currentStep === "mails" ? (
-        <StepFour adminKey={key} emailLogs={emailLogs} mailTemplates={mailTemplates} usingDemoData={usingDemoData} />
+        <StepFour
+          adminKey={key}
+          defaultMonth={defaultMonth}
+          emailLogs={emailLogs}
+          mailTemplates={mailTemplates}
+          usingDemoData={usingDemoData}
+        />
       ) : null}
       {currentStep === "summary" ? (
         <StepFive

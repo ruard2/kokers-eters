@@ -363,11 +363,11 @@ export async function sendPreferenceChecksAction(formData: FormData) {
   const month = parseMonthInput(text(formData, "month"));
   try {
     const sent = await sendPreferenceChecksForMonth(month);
-    redirectAdmin(key, `${sent} voorkeursmails aangemaakt/verwerkt.`, { step: "planning" });
+    redirectAdmin(key, `${sent} meedoen-check(s) aangemaakt/verwerkt.`, { step: "mails" });
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
       redirectAdmin(key, "Database niet bereikbaar. Voorkeursmails kunnen pas met een echte database.", {
-        step: "planning"
+        step: "mails"
       });
     }
 
