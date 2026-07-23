@@ -75,7 +75,7 @@ Zet daarna deze variabelen op de app-service:
 - `AUTO_SEND_ROUNDS`
 - optioneel: `REQUIRE_DATABASE_MIGRATIONS`
 
-Gebruik de `DATABASE_URL` van Railway PostgreSQL. `APP_URL` moet de publieke Railway URL van de app zijn, bijvoorbeeld `https://kokers-eters-production.up.railway.app`.
+Gebruik de `DATABASE_URL` van Railway PostgreSQL. `APP_URL` moet de publieke Railway URL van de app zijn, bijvoorbeeld `https://kokers-eters-production.up.railway.app`. Als je per ongeluk alleen `kokers-eters-production.up.railway.app` invult, zet de app er zelf `https://` voor.
 `ADMIN_EMAIL` krijgt meldingen over nieuwe of gewijzigde aanmeldingen en reminders om nieuwe rondes klaar te zetten.
 
 ### Poort (belangrijk, dit veroorzaakt 502)
