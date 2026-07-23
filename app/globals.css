@@ -588,6 +588,19 @@ th {
   margin: 8px 0;
 }
 
+.compact-muted,
+.section-hint,
+.field-hint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.compact-muted {
+  margin: 4px 0 8px;
+}
+
 .step-card-flat {
   align-content: center;
   border-left: 4px solid var(--green);
@@ -632,34 +645,127 @@ th {
   align-items: end;
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(170px, 0.8fr) minmax(220px, 1fr) auto;
 }
 
 .planning-form button {
   min-height: 44px;
 }
 
-.step-notes {
+.step-notes,
+.planning-explainer {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.step-notes div {
+.step-notes div,
+.planning-explainer div {
   border-top: 1px solid var(--line);
   display: grid;
   gap: 4px;
   padding-top: 10px;
 }
 
-.step-notes strong {
+.step-notes strong,
+.planning-explainer strong {
   font-size: 13px;
 }
 
-.step-notes span {
+.step-notes span,
+.planning-explainer span {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
+}
+
+.round-list {
+  display: grid;
+  gap: 8px;
+}
+
+.round-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.round-card summary {
+  align-items: center;
+  background: #fbfcfa;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 12px 14px;
+}
+
+.round-card summary strong,
+.round-card summary small {
+  display: block;
+}
+
+.round-card summary small {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.round-card-body {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px 14px;
+}
+
+.round-card-action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.round-match-list {
+  display: grid;
+  gap: 6px;
+}
+
+.round-match-line {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 28px minmax(110px, 1fr) minmax(48px, 96px) minmax(110px, 1fr) minmax(150px, 0.9fr);
+}
+
+.round-match-line > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.round-match-line em {
+  background: linear-gradient(90deg, var(--green), var(--blue));
+  border-radius: 999px;
+  display: block;
+  height: 2px;
+}
+
+.round-match-line small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mail-cycle-note {
+  background: #fbfcfa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+}
+
+.mail-cycle-note span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .mail-template-list {
@@ -688,11 +794,39 @@ th {
   text-align: right;
 }
 
+.mail-template-card summary strong {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.template-status {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 3px 7px;
+}
+
+.template-status.on {
+  background: var(--success);
+  color: var(--green-dark);
+}
+
+.template-status.off {
+  background: var(--danger);
+  color: #751b32;
+}
+
 .mail-template-form {
   border-top: 1px solid var(--line);
   display: grid;
   gap: 12px;
   padding: 14px;
+}
+
+.template-enabled {
+  justify-content: flex-start;
 }
 
 .mail-template-form textarea {
@@ -1238,8 +1372,10 @@ th {
   .planning-form,
   .step-grid,
   .step-notes,
+  .planning-explainer,
   .summary-cards,
-  .step-empty {
+  .step-empty,
+  .round-match-line {
     grid-template-columns: 1fr;
   }
 
@@ -1270,6 +1406,15 @@ th {
 
   .qr-card {
     grid-template-columns: 1fr;
+  }
+
+  .round-card-action {
+    justify-content: flex-start;
+  }
+
+  .round-match-line em {
+    height: 3px;
+    width: 80px;
   }
 
   .match-review-header {

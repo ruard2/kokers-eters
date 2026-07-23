@@ -16,7 +16,6 @@ import {
   wantsToHost
 } from "@/lib/forms";
 import {
-  sendAdminParticipantNotice,
   sendConfirmationEmails,
   sendEaterChoiceEmail,
   sendWelcomeEmail
@@ -130,9 +129,6 @@ export async function registerParticipant(formData: FormData) {
     redirect("/aanmelden?error=address");
   }
 
-  const previous = await prisma.participant.findUnique({
-    where: { email: data.email }
-  });
   const participant = await prisma.participant.upsert({
     where: { email: data.email },
     create: {
@@ -143,7 +139,6 @@ export async function registerParticipant(formData: FormData) {
   });
 
   await sendWelcomeEmail(participant);
-  await sendAdminParticipantNotice(participant, previous ? "updated" : "created", previous);
   redirect(`/bedankt?token=${participant.preferenceToken}`);
 }
 
@@ -162,12 +157,11 @@ export async function updatePreferences(formData: FormData) {
     redirect(`/voorkeuren/${token}?error=missing`);
   }
 
-  const updated = await prisma.participant.update({
+  await prisma.participant.update({
     where: { id: participant.id },
     data
   });
 
-  await sendAdminParticipantNotice(updated, "updated", participant);
   redirect(`/voorkeuren/${token}?saved=1`);
 }
 
@@ -387,7 +381,7 @@ export async function runJobsAction(formData: FormData) {
     const result = await runDueJobs();
     redirectAdmin(
       key,
-      `Jobs klaar: ${result.preferenceChecks} voorkeurschecks, ${result.hostInvites} host-mails, ${result.fallbackMails} fallback-mails.`,
+      `Jobs klaar: ${result.preferenceChecks} voorkeurschecks en ${result.hostInvites} host-mails.`,
       { step: "summary" }
     );
   } catch (error) {
@@ -406,6 +400,7 @@ export async function saveMailTemplateAction(formData: FormData) {
   const type = text(formData, "type");
   const subject = text(formData, "subject");
   const body = text(formData, "body");
+  const enabled = formData.get("enabled") === "on";
   const definition = mailTemplateDefinition(type);
 
   if (!definition) {
@@ -422,14 +417,18 @@ export async function saveMailTemplateAction(formData: FormData) {
       create: {
         type,
         subject,
-        body
+        body,
+        enabled
       },
       update: {
         subject,
-        body
+        body,
+        enabled
       }
     });
-    redirectAdmin(key, `${definition.label} opgeslagen.`, { step: "mails" });
+    redirectAdmin(key, `${definition.label} ${enabled ? "staat aan en is opgeslagen" : "staat uit en is opgeslagen"}.`, {
+      step: "mails"
+    });
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
       redirectAdmin(key, "Database niet bereikbaar. Mailtemplates opslaan kan pas met een echte database.", {

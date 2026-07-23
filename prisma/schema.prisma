@@ -136,6 +136,7 @@ model MailTemplate {
   type      String   @unique
   subject   String
   body      String
+  enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

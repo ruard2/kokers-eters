@@ -8,9 +8,7 @@ export type MailTemplateType =
   | "CONFIRMATION_HOST"
   | "CONFIRMATION_EATER"
   | "FALLBACK_HOST"
-  | "FALLBACK_EATER"
-  | "ADMIN_PARTICIPANT_NOTICE"
-  | "ADMIN_RENEWAL_REMINDER";
+  | "FALLBACK_EATER";
 
 export type MailTemplateDefinition = {
   type: MailTemplateType;
@@ -19,6 +17,8 @@ export type MailTemplateDefinition = {
   title: string;
   subject: string;
   body: string;
+  adminVisible?: boolean;
+  defaultEnabled?: boolean;
 };
 
 export type TemplateValues = Record<string, string | number | null | undefined>;
@@ -37,12 +37,13 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "",
       "Je kunt je voorkeuren later aanpassen via deze persoonlijke link:",
       "{{preferencesUrl}}"
-    ].join("\n")
+    ].join("\n"),
+    adminVisible: false
   },
   {
     type: "PREFERENCE_CHECK",
     label: "Meedoen-check",
-    description: "Vooraf naar deelnemers: doe je deze ronde mee?",
+    description: "Optioneel vooraf naar deelnemers: doe je deze ronde mee?",
     title: "Doe je mee in {{month}}?",
     subject: "Doe je mee in {{month}}?",
     body: [
@@ -55,7 +56,8 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "",
       "Voorkeuren wijzigen:",
       "{{preferencesUrl}}"
-    ].join("\n")
+    ].join("\n"),
+    adminVisible: true
   },
   {
     type: "HOST_INVITE",
@@ -68,15 +70,23 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "",
       "Voor {{month}} ben je gekoppeld aan {{eaterName}} ({{partySize}} persoon/personen).",
       "",
+      "Contact eter:",
+      "{{eaterName}}",
+      "{{eaterEmail}}",
+      "{{eaterWhatsapp}}",
+      "",
       "Allergieen of dieetwensen:",
       "{{allergies}}",
       "",
       "Kies via deze link welke dagen kunnen. Daarna kiest de eter daaruit de definitieve dag:",
       "{{hostUrl}}",
       "",
+      "Je mag ook rechtstreeks contact opnemen als dat sneller is.",
+      "",
       "Voorkeuren wijzigen:",
       "{{preferencesUrl}}"
-    ].join("\n")
+    ].join("\n"),
+    adminVisible: true
   },
   {
     type: "EATER_CHOICE",
@@ -89,7 +99,10 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "",
       "Je bent gekoppeld aan {{hostName}}.",
       "",
-      "Adres:",
+      "Contact koker:",
+      "{{hostName}}",
+      "{{hostEmail}}",
+      "{{hostWhatsapp}}",
       "{{address}}",
       "",
       "Opmerking of vraag van de host:",
@@ -99,8 +112,11 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "{{dates}}",
       "",
       "Kies via deze link de definitieve dag:",
-      "{{eaterUrl}}"
-    ].join("\n")
+      "{{eaterUrl}}",
+      "",
+      "Je mag ook rechtstreeks contact opnemen als dat sneller is."
+    ].join("\n"),
+    adminVisible: true
   },
   {
     type: "CONFIRMATION_HOST",
@@ -126,7 +142,8 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "",
       "Allergieen of dieetwensen:",
       "{{allergies}}"
-    ].join("\n")
+    ].join("\n"),
+    adminVisible: true
   },
   {
     type: "CONFIRMATION_EATER",
@@ -152,7 +169,8 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "",
       "Allergieen of dieetwensen:",
       "{{allergies}}"
-    ].join("\n")
+    ].join("\n"),
+    adminVisible: true
   },
   {
     type: "FALLBACK_HOST",
@@ -178,7 +196,9 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "",
       "Allergieen of dieetwensen:",
       "{{allergies}}"
-    ].join("\n")
+    ].join("\n"),
+    adminVisible: false,
+    defaultEnabled: false
   },
   {
     type: "FALLBACK_EATER",
@@ -204,46 +224,13 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "",
       "Allergieen of dieetwensen:",
       "{{allergies}}"
-    ].join("\n")
-  },
-  {
-    type: "ADMIN_PARTICIPANT_NOTICE",
-    label: "Admin: aanmelding",
-    description: "Naar de admin bij een nieuwe of gewijzigde aanmelding.",
-    title: "Aanmelding gewijzigd",
-    subject: "Houvast: {{actionLabel}} van {{name}}",
-    body: [
-      "{{actionLabel}}:",
-      "{{name}}",
-      "{{email}}",
-      "{{whatsapp}}",
-      "",
-      "Wijzigingen:",
-      "{{changes}}",
-      "",
-      "Aanpassen:",
-      "{{adminEditUrl}}",
-      "",
-      "Akkoord, niets doen:",
-      "{{adminOkUrl}}",
-      "",
-      "Geen reactie betekent: akkoord."
-    ].join("\n")
-  },
-  {
-    type: "ADMIN_RENEWAL_REMINDER",
-    label: "Admin: opnieuw klaarzetten",
-    description: "Naar de admin als er geen toekomstige ronde meer klaarstaat.",
-    title: "Nieuwe rondes klaarzetten",
-    subject: "Houvast: zet nieuwe rondes klaar",
-    body: [
-      "Er staat geen toekomstige ronde meer klaar.",
-      "",
-      "Open de admin en doorloop de stappen opnieuw:",
-      "{{adminUrl}}"
-    ].join("\n")
+    ].join("\n"),
+    adminVisible: false,
+    defaultEnabled: false
   }
 ];
+
+export const adminMailTemplateDefinitions = mailTemplateDefinitions.filter((definition) => definition.adminVisible);
 
 export function mailTemplateDefinition(type: string) {
   return mailTemplateDefinitions.find((definition) => definition.type === type) || null;
@@ -286,10 +273,12 @@ export async function renderMailTemplate(type: MailTemplateType, values: Templat
   const subject = replaceTemplateValues(saved?.subject || definition.subject, values);
   const title = replaceTemplateValues(definition.title, values);
   const body = replaceTemplateValues(saved?.body || definition.body, values);
+  const enabled = saved?.enabled ?? definition.defaultEnabled ?? true;
 
   return {
     subject,
     title,
-    html: plainTextToHtml(body)
+    html: plainTextToHtml(body),
+    enabled
   };
 }

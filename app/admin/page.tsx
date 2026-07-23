@@ -4,7 +4,6 @@ import {
   cancelMatchAction,
   clearDemoAction,
   generatePlanningAction,
-  runJobsAction,
   seedDemoAction,
   saveAdminParticipantAction,
   saveMailTemplateAction,
@@ -13,17 +12,14 @@ import {
 } from "@/app/actions";
 import { AdminMatchBoard, type BoardMatch, type BoardRosterParticipant } from "@/components/AdminMatchBoard";
 import { CopyButton } from "@/components/CopyButton";
+import { CopyQrButton } from "@/components/CopyQrButton";
 import { demoSeedEnabled, isAdminKey } from "@/lib/admin";
 import { displayDate, displayMonth, jsonDateList, monthInputValue, toMonthStart } from "@/lib/dates";
 import { demoAdminData } from "@/lib/demo-data";
 import { prisma } from "@/lib/db";
-import { mailTemplateDefinitions } from "@/lib/mail-templates";
+import { adminMailTemplateDefinitions } from "@/lib/mail-templates";
 import { appUrl } from "@/lib/urls";
-import {
-  defaultPlanningSettings,
-  renewalCadenceLabel,
-  type PlanningSettingsView
-} from "@/lib/planning";
+import { defaultPlanningSettings, type PlanningSettingsView } from "@/lib/planning";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +92,12 @@ function statusLabel(value: string) {
   };
 
   return labels[value] || value;
+}
+
+function planningHorizonLabel(value: number) {
+  if (value === 12) return "jaar";
+  if (value === 3) return "kwartaal";
+  return "ronde";
 }
 
 function boardParticipant(participant: Participant) {
@@ -471,6 +473,81 @@ function RoundsTable({ adminKey, rounds, usingDemoData }: { adminKey: string; ro
   );
 }
 
+function RoundsAccordion({
+  adminKey,
+  matches,
+  rounds,
+  usingDemoData
+}: {
+  adminKey: string;
+  matches: MatchWithPeople[];
+  rounds: RoundWithMatches[];
+  usingDemoData: boolean;
+}) {
+  const orderedRounds = [...rounds].sort((a, b) => a.month.getTime() - b.month.getTime());
+  const matchesByRound = new Map<string, MatchWithPeople[]>();
+
+  for (const match of matches) {
+    const roundMatches = matchesByRound.get(match.roundId) || [];
+    roundMatches.push(match);
+    matchesByRound.set(match.roundId, roundMatches);
+  }
+
+  if (orderedRounds.length === 0) {
+    return <div className="board-empty">Nog geen rondes. Kies een startmaand en zet een ronde, kwartaal of jaar klaar.</div>;
+  }
+
+  return (
+    <div className="round-list">
+      {orderedRounds.map((round) => {
+        const roundMatches = (matchesByRound.get(round.id) || []).sort(
+          (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+        );
+        const matchCount = roundMatches.length || round.matches.length;
+
+        return (
+          <details className="round-card" key={round.id}>
+            <summary>
+              <span>
+                <strong>{displayMonth(round.month)}</strong>
+                <small>
+                  {statusLabel(round.status)} - {matchCount} verbinding(en)
+                </small>
+              </span>
+            </summary>
+            <div className="round-card-body">
+              <form action={sendHostInvitesAction} className="round-card-action">
+                <input type="hidden" name="adminKey" value={adminKey} />
+                <input type="hidden" name="roundId" value={round.id} />
+                <button className="small" disabled={usingDemoData || round.status !== "DRAFT"} type="submit">
+                  Goedkeuren + host-mails
+                </button>
+              </form>
+              {roundMatches.length > 0 ? (
+                <div className="round-match-list">
+                  {roundMatches.map((match, index) => (
+                    <div className="round-match-line" key={match.id}>
+                      <span>{index + 1}</span>
+                      <strong>{match.host.name}</strong>
+                      <em />
+                      <strong>{match.eater.name}</strong>
+                      <small>
+                        {match.partySize} persoon/personen - {statusLabel(match.status)}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="compact-muted">Nog geen matchdetails voor deze ronde.</p>
+              )}
+            </div>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
 function MatchesTable({ adminKey, matches, usingDemoData }: { adminKey: string; matches: MatchWithPeople[]; usingDemoData: boolean }) {
   return (
     <div className="table-wrap">
@@ -567,9 +644,11 @@ function StepOne({
           <img alt="QR-code naar de aanmeldpagina" src={`/api/qr?text=${encodeURIComponent(signupUrl)}`} />
           <div>
             <strong>Aanmeldpagina</strong>
+            <p className="compact-muted">Deel deze link of QR-code met deelnemers. Beide gaan naar hetzelfde aanmeldformulier.</p>
             <input readOnly value={signupUrl} />
             <div className="inline-actions">
               <CopyButton value={signupUrl} />
+              <CopyQrButton value={signupUrl} />
               <a className="button secondary" href="/aanmelden">
                 Open pagina
               </a>
@@ -600,12 +679,14 @@ function StepOne({
 function StepTwo({
   adminKey,
   defaultMonth,
+  matches,
   planningSettings,
   rounds,
   usingDemoData
 }: {
   adminKey: string;
   defaultMonth: string;
+  matches: MatchWithPeople[];
   planningSettings: PlanningSettingsView;
   rounds: RoundWithMatches[];
   usingDemoData: boolean;
@@ -614,9 +695,15 @@ function StepTwo({
     <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 2" title="Rondes klaarzetten">
       <form action={generatePlanningAction} className="planning-form">
         <input type="hidden" name="adminKey" value={adminKey} />
+        <input type="hidden" name="adminCheckDaysBefore" value={planningSettings.adminCheckDaysBefore} />
+        <input type="hidden" name="hostMailDaysBefore" value={planningSettings.hostMailDaysBefore} />
+        <input type="hidden" name="eaterMailDelayDays" value={planningSettings.eaterMailDelayDays} />
+        <input type="hidden" name="reminderDaysAfter" value={planningSettings.reminderDaysAfter} />
+        <input type="hidden" name="renewalCadence" value={planningSettings.renewalCadence} />
         <label>
           Startmaand
           <input name="startMonth" type="month" defaultValue={defaultMonth} />
+          <span className="field-hint">De eerste maand waarvoor je conceptmatches wilt maken.</span>
         </label>
         <label>
           Voor hoelang klaarzetten
@@ -625,48 +712,25 @@ function StepTwo({
             <option value={3}>Kwartaal</option>
             <option value={12}>Jaar</option>
           </select>
-        </label>
-        <label>
-          Admin-check vooraf
-          <input defaultValue={planningSettings.adminCheckDaysBefore} min={1} max={90} name="adminCheckDaysBefore" type="number" />
-        </label>
-        <label>
-          Host-mail vooraf
-          <input defaultValue={planningSettings.hostMailDaysBefore} min={1} max={120} name="hostMailDaysBefore" type="number" />
-        </label>
-        <label>
-          Eter-mail na host
-          <input defaultValue={planningSettings.eaterMailDelayDays} min={1} max={30} name="eaterMailDelayDays" type="number" />
-        </label>
-        <label>
-          Reminder na
-          <input defaultValue={planningSettings.reminderDaysAfter} min={1} max={30} name="reminderDaysAfter" type="number" />
-        </label>
-        <label>
-          Opnieuw klaarzetten
-          <select defaultValue={planningSettings.renewalCadence} name="renewalCadence">
-            <option value="TWO_WEEKS">Na twee weken</option>
-            <option value="QUARTER">Na kwartaal</option>
-            <option value="YEAR">Na jaar</option>
-          </select>
+          <span className="field-hint">Een ronde is een maand. Een jaar maakt twaalf maandrondes in een keer.</span>
         </label>
         <button disabled={usingDemoData} type="submit">
           Rondes klaarzetten
         </button>
       </form>
 
-      <div className="step-notes">
+      <div className="planning-explainer">
         <div>
-          <strong>Admin</strong>
-          <span>krijgt reminder wanneer er geen toekomstige ronde meer klaarstaat.</span>
+          <strong>Wat gebeurt er?</strong>
+          <span>Het systeem maakt conceptmatches met de deelnemers zoals ze nu in de sheet staan.</span>
         </div>
         <div>
-          <strong>Kokers</strong>
-          <span>krijgen na goedkeuring hun mail met de eter en dagkeuze-link.</span>
+          <strong>Frequentie</strong>
+          <span>Eens per twee weken telt als twee plekken binnen een maandronde; eens per kwartaal slaat maanden over.</span>
         </div>
         <div>
-          <strong>Eters</strong>
-          <span>krijgen pas mail nadat de host dagen heeft opgegeven, of fallback na reminder.</span>
+          <strong>Mails</strong>
+          <span>Er gaat nog niets naar deelnemers. Eerst controleer en keur je de matches goed in stap 3.</span>
         </div>
       </div>
 
@@ -677,12 +741,16 @@ function StepTwo({
           <input name="month" type="month" defaultValue={defaultMonth} />
         </label>
         <button className="secondary" disabled={usingDemoData} type="submit">
-          Voorkeursmails nu sturen
+          Meedoen-check nu sturen
         </button>
       </form>
 
       <div className="nested-panel">
-        <RoundsTable adminKey={adminKey} rounds={rounds} usingDemoData={usingDemoData} />
+        <div className="section-header">
+          <h2>Rondes in de planning</h2>
+          <span className="section-hint">Klik een maand open om de verbindingen te zien.</span>
+        </div>
+        <RoundsAccordion adminKey={adminKey} matches={matches} rounds={rounds} usingDemoData={usingDemoData} />
       </div>
     </StepShell>
   );
@@ -712,6 +780,7 @@ function StepThree({
           <span className="review-month">{reviewRound ? displayMonth(reviewRound.month) : "Geen ronde"}</span>
           <p>
             Sleep blokjes om verbindingen te wijzigen. Groen betekent dat capaciteit, rol, vorm en admin-blokkades kloppen.
+            Permanente blokkades zet je in de sheet bij <strong>Niet met</strong>; gebruik daar een nummer, naam of e-mail.
           </p>
         </div>
         <div className="inline-actions">
@@ -761,18 +830,33 @@ function StepFour({
 
   return (
     <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 4" title="Mails klaarzetten">
+      <div className="mail-cycle-note">
+        <strong>Links staan automatisch klaar.</strong>
+        <span>
+          Per match vult het systeem de juiste persoonlijke URL in, zoals hostUrl, eaterUrl, participateUrl en
+          preferencesUrl. Zet een mail uit als je die stap niet wilt gebruiken.
+        </span>
+      </div>
       <div className="mail-template-list">
-        {mailTemplateDefinitions.map((definition) => {
+        {adminMailTemplateDefinitions.map((definition) => {
           const saved = savedTemplates.get(definition.type);
+          const enabled = saved?.enabled ?? definition.defaultEnabled ?? true;
           return (
             <details className="mail-template-card" key={definition.type}>
               <summary>
-                <strong>{definition.label}</strong>
+                <strong>
+                  {definition.label}
+                  <span className={`template-status ${enabled ? "on" : "off"}`}>{enabled ? "Aan" : "Uit"}</span>
+                </strong>
                 <span>{definition.description}</span>
               </summary>
               <form action={saveMailTemplateAction} className="mail-template-form">
                 <input type="hidden" name="adminKey" value={adminKey} />
                 <input type="hidden" name="type" value={definition.type} />
+                <label className="check-row template-enabled">
+                  <input defaultChecked={enabled} disabled={usingDemoData} name="enabled" type="checkbox" />
+                  Deze mail versturen
+                </label>
                 <label>
                   Onderwerp
                   <input defaultValue={saved?.subject || definition.subject} disabled={usingDemoData} name="subject" />
@@ -826,8 +910,7 @@ function StepFive({
   const eaterCount = activeParticipants.filter((participant) => participant.mode !== "HOST").length;
   const guestCount = activeParticipants.filter((participant) => participant.isGuest).length;
   const memberCount = activeParticipants.length - guestCount;
-  const savedPlanningLabel =
-    planningSettings.horizonMonths === 12 ? "jaar" : planningSettings.horizonMonths === 3 ? "kwartaal" : "ronde";
+  const savedPlanningLabel = planningHorizonLabel(planningSettings.horizonMonths);
 
   return (
     <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 5" title="Samenvatting en afronden">
@@ -842,9 +925,7 @@ function StepFive({
         <div>
           <span>Stap 2</span>
           <strong>{rounds.length} ronde(s)</strong>
-          <small>
-            Planning staat op {savedPlanningLabel}; opnieuw klaarzetten {renewalCadenceLabel(planningSettings.renewalCadence)}.
-          </small>
+          <small>Planning staat op {savedPlanningLabel}; alle rondes blijven uitklapbaar in dit overzicht.</small>
         </div>
         <div>
           <span>Stap 3</span>
@@ -853,7 +934,7 @@ function StepFive({
         </div>
         <div>
           <span>Stap 4</span>
-          <strong>{mailTemplateDefinitions.length} mailconcepten</strong>
+          <strong>{adminMailTemplateDefinitions.length} cyclusmails</strong>
           <small>{emailLogs.length} laatste mail-logregels zichtbaar.</small>
         </div>
       </div>
@@ -880,14 +961,8 @@ function StepFive({
       <div className="nested-panel">
         <div className="section-header">
           <h2>Gehele planning</h2>
-          <form action={runJobsAction}>
-            <input type="hidden" name="adminKey" value={adminKey} />
-            <button className="small secondary" disabled={usingDemoData} type="submit">
-              Jobs draaien
-            </button>
-          </form>
         </div>
-        <RoundsTable adminKey={adminKey} rounds={rounds} usingDemoData={usingDemoData} />
+        <RoundsAccordion adminKey={adminKey} matches={matches} rounds={rounds} usingDemoData={usingDemoData} />
       </div>
 
       <div className="nested-panel worksheet-panel">
@@ -982,7 +1057,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
       templateRows
     ] = await Promise.all([
       prisma.participant.findMany({ orderBy: { createdAt: "asc" }, take: 120 }),
-      prisma.matchRound.findMany({ orderBy: { month: "desc" }, take: 18, include: { matches: true } }),
+      prisma.matchRound.findMany({ orderBy: { month: "asc" }, take: 36, include: { matches: true } }),
       prisma.mealMatch.findMany({
         orderBy: { createdAt: "desc" },
         take: 120,
@@ -1054,6 +1129,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
         <StepTwo
           adminKey={key}
           defaultMonth={defaultMonth}
+          matches={matches}
           planningSettings={planningSettings}
           rounds={rounds}
           usingDemoData={usingDemoData}

@@ -1,6 +1,5 @@
 import type { MealMatch, MatchRound, Participant } from "@prisma/client";
 import { Resend } from "resend";
-import { adminToken } from "./admin";
 import { displayDate, displayMonth, jsonDateList, monthInputValue } from "./dates";
 import { prisma } from "./db";
 import { renderMailTemplate } from "./mail-templates";
@@ -47,64 +46,6 @@ function fallbackText(value: string | null | undefined, fallback = "Geen bijzond
 function dateText(value: unknown) {
   const dates = jsonDateList(value);
   return dates.length > 0 ? dates.map(displayDate).join("\n") : "spreek samen een moment af";
-}
-
-function adminUrl(params: Record<string, string>) {
-  const query = new URLSearchParams({
-    key: adminToken(),
-    ...params
-  });
-  return appUrl(`/?${query.toString()}`);
-}
-
-function participantValue(value: unknown) {
-  if (value === null || value === undefined || value === "") {
-    return "-";
-  }
-
-  if (typeof value === "boolean") {
-    return value ? "ja" : "nee";
-  }
-
-  return String(value);
-}
-
-function participantFieldValue(key: keyof Participant, value: unknown) {
-  if (key === "isGuest") {
-    return value ? "Gast" : "Gemeentelid";
-  }
-
-  return participantValue(value);
-}
-
-function participantChanges(previous: Participant | null | undefined, next: Participant) {
-  if (!previous) {
-    return "Nieuwe aanmelding.";
-  }
-
-  const fields: Array<[keyof Participant, string]> = [
-    ["name", "Naam"],
-    ["email", "E-mail"],
-    ["whatsapp", "WhatsApp"],
-    ["mode", "Rol"],
-    ["comingWithCount", "Komt met"],
-    ["hostCapacity", "Kan ontvangen"],
-    ["eaterFrequency", "Frequentie eten"],
-    ["hostFrequency", "Frequentie koken"],
-    ["allergies", "Allergieen/dieet"],
-    ["address", "Adres"],
-    ["cannotEatDays", "Kan niet eten"],
-    ["cannotHostDays", "Kan niet koken"],
-    ["isGuest", "Wat ben je"],
-    ["gatheringType", "Vorm"],
-    ["active", "Actief"]
-  ];
-
-  const changes = fields
-    .filter(([key]) => participantFieldValue(key, previous[key]) !== participantFieldValue(key, next[key]))
-    .map(([key, label]) => `${label}: ${participantFieldValue(key, previous[key])} -> ${participantFieldValue(key, next[key])}`);
-
-  return changes.length > 0 ? changes.join("\n") : "Geen inhoudelijke wijziging gevonden.";
 }
 
 export async function sendEmail(input: EmailInput) {
@@ -188,6 +129,10 @@ export async function sendWelcomeEmail(participant: Participant) {
     preferencesUrl
   });
 
+  if (!rendered.enabled) {
+    return { status: "skipped_disabled" };
+  }
+
   return sendEmail({
     to: participant.email,
     participantId: participant.id,
@@ -208,6 +153,10 @@ export async function sendPreferenceCheck(participant: Participant, month: Date)
     preferencesUrl
   });
 
+  if (!rendered.enabled) {
+    return { status: "skipped_disabled" };
+  }
+
   return sendEmail({
     to: participant.email,
     participantId: participant.id,
@@ -224,12 +173,18 @@ export async function sendHostInvite(match: MatchWithPeople) {
   const rendered = await renderMailTemplate("HOST_INVITE", {
     hostName: match.host.name,
     eaterName: match.eater.name,
+    eaterEmail: match.eater.email,
+    eaterWhatsapp: match.eater.whatsapp,
     month: displayMonth(match.round.month),
     partySize: match.partySize,
     allergies: fallbackText(match.eater.allergies),
     hostUrl,
     preferencesUrl
   });
+
+  if (!rendered.enabled) {
+    return { status: "skipped_disabled" };
+  }
 
   return sendEmail({
     to: match.host.email,
@@ -246,11 +201,17 @@ export async function sendEaterChoiceEmail(match: MatchWithPeople) {
   const rendered = await renderMailTemplate("EATER_CHOICE", {
     eaterName: match.eater.name,
     hostName: match.host.name,
+    hostEmail: match.host.email,
+    hostWhatsapp: match.host.whatsapp,
     address: fallbackText(match.host.address, "Adres volgt via de host."),
     hostNote: fallbackText(match.hostNote),
     dates: dateText(match.proposedDates),
     eaterUrl
   });
+
+  if (!rendered.enabled) {
+    return { status: "skipped_disabled" };
+  }
 
   return sendEmail({
     to: match.eater.email,
@@ -278,14 +239,20 @@ export async function sendConfirmationEmails(match: MatchWithPeople) {
   const hostRendered = await renderMailTemplate("CONFIRMATION_HOST", values);
   const eaterRendered = await renderMailTemplate("CONFIRMATION_EATER", values);
 
-  await sendEmail({
-    to: match.host.email,
-    participantId: match.hostId,
-    matchId: match.id,
-    type: "CONFIRMATION_HOST",
-    subject: hostRendered.subject,
-    html: layout(hostRendered.title, hostRendered.html)
-  });
+  if (hostRendered.enabled) {
+    await sendEmail({
+      to: match.host.email,
+      participantId: match.hostId,
+      matchId: match.id,
+      type: "CONFIRMATION_HOST",
+      subject: hostRendered.subject,
+      html: layout(hostRendered.title, hostRendered.html)
+    });
+  }
+
+  if (!eaterRendered.enabled) {
+    return { status: "skipped_disabled" };
+  }
 
   return sendEmail({
     to: match.eater.email,
@@ -315,14 +282,20 @@ export async function sendFallbackEmails(match: MatchWithPeople, reason: "host" 
   const hostRendered = await renderMailTemplate("FALLBACK_HOST", values);
   const eaterRendered = await renderMailTemplate("FALLBACK_EATER", values);
 
-  await sendEmail({
-    to: match.host.email,
-    participantId: match.hostId,
-    matchId: match.id,
-    type: "FALLBACK_HOST",
-    subject: hostRendered.subject,
-    html: layout(hostRendered.title, hostRendered.html)
-  });
+  if (hostRendered.enabled) {
+    await sendEmail({
+      to: match.host.email,
+      participantId: match.hostId,
+      matchId: match.id,
+      type: "FALLBACK_HOST",
+      subject: hostRendered.subject,
+      html: layout(hostRendered.title, hostRendered.html)
+    });
+  }
+
+  if (!eaterRendered.enabled) {
+    return { status: "skipped_disabled" };
+  }
 
   return sendEmail({
     to: match.eater.email,
@@ -331,56 +304,5 @@ export async function sendFallbackEmails(match: MatchWithPeople, reason: "host" 
     type: "FALLBACK_EATER",
     subject: eaterRendered.subject,
     html: layout(eaterRendered.title, eaterRendered.html)
-  });
-}
-
-export async function sendAdminParticipantNotice(
-  participant: Participant,
-  action: "created" | "updated",
-  previous?: Participant | null
-) {
-  const adminEmail = process.env.ADMIN_EMAIL;
-  if (!adminEmail) {
-    return { status: "skipped_no_admin_email" };
-  }
-
-  const actionLabel = action === "created" ? "Nieuwe aanmelding" : "Wijziging in aanmelding";
-  const rendered = await renderMailTemplate("ADMIN_PARTICIPANT_NOTICE", {
-    actionLabel,
-    name: participant.name,
-    email: participant.email,
-    whatsapp: participant.whatsapp,
-    changes: participantChanges(previous, participant),
-    adminEditUrl: adminUrl({ step: "participants", sheet: "1" }),
-    adminOkUrl: adminUrl({ step: "summary" })
-  });
-
-  return sendEmail({
-    to: adminEmail,
-    participantId: participant.id,
-    type: "ADMIN_PARTICIPANT_NOTICE",
-    contextKey: `admin-participant:${participant.id}:${participant.updatedAt.getTime()}`,
-    subject: rendered.subject,
-    html: layout(rendered.title, rendered.html)
-  });
-}
-
-export async function sendAdminRenewalReminder(month: Date) {
-  const adminEmail = process.env.ADMIN_EMAIL;
-  if (!adminEmail) {
-    return { status: "skipped_no_admin_email" };
-  }
-
-  const monthKey = monthInputValue(month);
-  const rendered = await renderMailTemplate("ADMIN_RENEWAL_REMINDER", {
-    adminUrl: adminUrl({ step: "planning" })
-  });
-
-  return sendEmail({
-    to: adminEmail,
-    type: "ADMIN_RENEWAL_REMINDER",
-    contextKey: `admin-renewal:${monthKey}`,
-    subject: rendered.subject,
-    html: layout(rendered.title, rendered.html)
   });
 }
