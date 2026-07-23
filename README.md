@@ -59,7 +59,7 @@ Koppel de GitHub-repo aan Railway en voeg een PostgreSQL database toe. Deze repo
 
 - build command: `npm ci && npm run build`
 - pre-deploy command: `node scripts/migrate-deploy-optional.mjs`
-- start command: `npm run start`
+- start command: `node scripts/start.mjs`
 - healthcheck: `/api/health`
 
 Zet daarna deze variabelen op de app-service:
@@ -68,16 +68,16 @@ Zet daarna deze variabelen op de app-service:
 - `APP_URL`
 - `ADMIN_TOKEN`
 - `CRON_SECRET`
+- `PORT=8081`
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
 - `AUTO_GENERATE_ROUNDS`
 - `AUTO_SEND_ROUNDS`
 - optioneel: `REQUIRE_DATABASE_MIGRATIONS`
-- optioneel lokaal: `APP_PORT=8081`
 
 Gebruik de `DATABASE_URL` van Railway PostgreSQL. `APP_URL` moet de publieke Railway URL van de app zijn, bijvoorbeeld `https://kokers-eters-production.up.railway.app`.
 
-De app start via een klein Node-script dat expliciet luistert op `0.0.0.0:$PORT`, zoals Railway verwacht. Zonder Railway `PORT` gebruikt het script lokaal `APP_PORT`, en daarna fallback `8081`. De database-migraties draaien in Railway via de pre-deploy stap als `DATABASE_URL` goed staat. Als de database nog niet bereikbaar is, start de app alsnog met de demo/fallback adminweergave. Zet `REQUIRE_DATABASE_MIGRATIONS=true` als een deploy juist moet falen wanneer migraties niet lukken.
+De publieke Railway-domain staat in deze setup op target port `8081`. Zet daarom ook de service variable `PORT=8081`; Railway gebruikt `PORT` voor healthchecks en de app luistert op `0.0.0.0:$PORT`. Gebruik geen `APP_PORT` in Railway. Zonder `PORT` gebruikt het startscript alleen lokaal fallback `8081`. De database-migraties draaien in Railway via de pre-deploy stap als `DATABASE_URL` goed staat. Als de database nog niet bereikbaar is, start de app alsnog met de demo/fallback adminweergave. Zet `REQUIRE_DATABASE_MIGRATIONS=true` als een deploy juist moet falen wanneer migraties niet lukken.
 
 ## Automatische jobs
 

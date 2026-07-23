@@ -2,12 +2,16 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-const port = process.env.PORT || process.env.APP_PORT || "8081";
+const port = process.env.PORT || "8081";
 const nextBin = join(process.cwd(), "node_modules", "next", "dist", "bin", "next");
 
 if (!existsSync(nextBin)) {
   console.error("[start] Next.js binary not found. Did the install step finish?");
   process.exit(1);
+}
+
+if (!process.env.PORT) {
+  console.warn("[start] PORT is not set; falling back to local port 8081.");
 }
 
 console.log(`[start] Starting Next.js on 0.0.0.0:${port}`);
