@@ -4,7 +4,7 @@ import { CommunityScope, Frequency, GatheringType, MatchStatus, ParticipationMod
 import { redirect } from "next/navigation";
 import { demoSeedEnabled, isAdminKey } from "@/lib/admin";
 import { runDueJobs, sendHostInvitesForRound, sendPreferenceChecksForMonth } from "@/lib/automation";
-import { dateInputToDate, jsonDateList, parseMonthInput } from "@/lib/dates";
+import { addMonths, dateInputToDate, jsonDateList, parseMonthInput } from "@/lib/dates";
 import {
   communityScope,
   frequency,
@@ -16,9 +16,20 @@ import {
   wantsToEat,
   wantsToHost
 } from "@/lib/forms";
-import { sendConfirmationEmails, sendEaterChoiceEmail, sendWelcomeEmail } from "@/lib/mailer";
+import {
+  sendAdminParticipantNotice,
+  sendConfirmationEmails,
+  sendEaterChoiceEmail,
+  sendWelcomeEmail
+} from "@/lib/mailer";
+import { mailTemplateDefinition } from "@/lib/mail-templates";
 import { generateRoundForMonth } from "@/lib/matching";
 import { prisma } from "@/lib/db";
+import {
+  clampInt,
+  normalizeHorizon,
+  normalizeRenewalCadence
+} from "@/lib/planning";
 import { clearDemoData, seedDemoData } from "@/lib/seed";
 import { createToken } from "@/lib/tokens";
 
@@ -74,8 +85,13 @@ function requireAdmin(formData: FormData) {
   return key;
 }
 
-function redirectAdmin(key: string, notice: string) {
-  redirect(`/?key=${encodeURIComponent(key)}&notice=${encodeURIComponent(notice)}`);
+function redirectAdmin(key: string, notice: string, params: Record<string, string> = {}): never {
+  const query = new URLSearchParams({
+    key,
+    notice,
+    ...params
+  });
+  redirect(`/?${query.toString()}`);
 }
 
 function databaseUnavailableNotice(error: unknown) {
@@ -113,6 +129,9 @@ export async function registerParticipant(formData: FormData) {
     redirect("/aanmelden?error=address");
   }
 
+  const previous = await prisma.participant.findUnique({
+    where: { email: data.email }
+  });
   const participant = await prisma.participant.upsert({
     where: { email: data.email },
     create: {
@@ -123,6 +142,7 @@ export async function registerParticipant(formData: FormData) {
   });
 
   await sendWelcomeEmail(participant);
+  await sendAdminParticipantNotice(participant, previous ? "updated" : "created", previous);
   redirect(`/bedankt?token=${participant.preferenceToken}`);
 }
 
@@ -141,18 +161,18 @@ export async function updatePreferences(formData: FormData) {
     redirect(`/voorkeuren/${token}?error=missing`);
   }
 
-  await prisma.participant.update({
+  const updated = await prisma.participant.update({
     where: { id: participant.id },
     data
   });
 
+  await sendAdminParticipantNotice(updated, "updated", participant);
   redirect(`/voorkeuren/${token}?saved=1`);
 }
 
 export async function submitHostDates(formData: FormData) {
   const token = text(formData, "token");
   const dates = dateList(formData);
-  const cookingPlan = optionalText(formData, "cookingPlan");
   const hostNote = optionalText(formData, "hostNote");
 
   if (dates.length === 0) {
@@ -166,13 +186,6 @@ export async function submitHostDates(formData: FormData) {
 
   if (!match || match.status === MatchStatus.CANCELLED) {
     redirect(`/koker/${token}?error=missing`);
-  }
-
-  if (cookingPlan !== match.host.cookingPlan) {
-    await prisma.participant.update({
-      where: { id: match.hostId },
-      data: { cookingPlan }
-    });
   }
 
   const updated = await prisma.mealMatch.update({
@@ -265,10 +278,70 @@ export async function generateMonthlyRoundAction(formData: FormData) {
   const month = parseMonthInput(text(formData, "month"));
   try {
     const result = await generateRoundForMonth(month);
-    redirectAdmin(key, `${result.matched} matches gemaakt voor ${result.requested} eetverzoeken.`);
+    redirectAdmin(key, `${result.matched} matches gemaakt voor ${result.requested} eetverzoeken.`, { step: "review" });
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
-      redirectAdmin(key, "Database niet bereikbaar. Demo-werkblad blijft zichtbaar; start Postgres voor echte acties.");
+      redirectAdmin(key, "Database niet bereikbaar. Demo-werkblad blijft zichtbaar; start Postgres voor echte acties.", {
+        step: "planning"
+      });
+    }
+
+    throw error;
+  }
+}
+
+export async function generatePlanningAction(formData: FormData) {
+  const key = requireAdmin(formData);
+  const startMonth = parseMonthInput(text(formData, "startMonth"));
+  const horizonMonths = normalizeHorizon(formData.get("horizonMonths"));
+  const settings = {
+    horizonMonths,
+    adminCheckDaysBefore: clampInt(formData.get("adminCheckDaysBefore"), 14, 1, 90),
+    hostMailDaysBefore: clampInt(formData.get("hostMailDaysBefore"), 21, 1, 120),
+    eaterMailDelayDays: clampInt(formData.get("eaterMailDelayDays"), 3, 1, 30),
+    reminderDaysAfter: clampInt(formData.get("reminderDaysAfter"), 3, 1, 30),
+    renewalCadence: normalizeRenewalCadence(formData.get("renewalCadence"))
+  };
+
+  try {
+    await prisma.planningSettings.upsert({
+      where: { id: "default" },
+      create: {
+        id: "default",
+        ...settings
+      },
+      update: settings
+    });
+
+    let matched = 0;
+    let requested = 0;
+    let skipped = 0;
+    for (let index = 0; index < horizonMonths; index += 1) {
+      try {
+        const result = await generateRoundForMonth(addMonths(startMonth, index));
+        matched += result.matched;
+        requested += result.requested;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes("al verstuurd")) {
+          skipped += 1;
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    redirectAdmin(
+      key,
+      `${horizonMonths - skipped} ronde(s) klaargezet: ${matched} matches voor ${requested} eetverzoeken.${skipped ? ` ${skipped} bestaande verstuurde ronde(s) overgeslagen.` : ""}`,
+      { step: "review" }
+    );
+  } catch (error) {
+    if (databaseUnavailableNotice(error)) {
+      redirectAdmin(key, "Database niet bereikbaar. Planning klaarzetten kan pas met een echte database.", {
+        step: "planning"
+      });
     }
 
     throw error;
@@ -280,10 +353,10 @@ export async function sendHostInvitesAction(formData: FormData) {
   const roundId = text(formData, "roundId") || undefined;
   try {
     const sent = await sendHostInvitesForRound(roundId);
-    redirectAdmin(key, `${sent} host-mails verstuurd.`);
+    redirectAdmin(key, `${sent} host-mails verstuurd.`, { step: "mails" });
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
-      redirectAdmin(key, "Database niet bereikbaar. Host-mails kunnen pas met een echte database.");
+      redirectAdmin(key, "Database niet bereikbaar. Host-mails kunnen pas met een echte database.", { step: "review" });
     }
 
     throw error;
@@ -295,10 +368,12 @@ export async function sendPreferenceChecksAction(formData: FormData) {
   const month = parseMonthInput(text(formData, "month"));
   try {
     const sent = await sendPreferenceChecksForMonth(month);
-    redirectAdmin(key, `${sent} voorkeursmails aangemaakt/verwerkt.`);
+    redirectAdmin(key, `${sent} voorkeursmails aangemaakt/verwerkt.`, { step: "planning" });
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
-      redirectAdmin(key, "Database niet bereikbaar. Voorkeursmails kunnen pas met een echte database.");
+      redirectAdmin(key, "Database niet bereikbaar. Voorkeursmails kunnen pas met een echte database.", {
+        step: "planning"
+      });
     }
 
     throw error;
@@ -311,11 +386,54 @@ export async function runJobsAction(formData: FormData) {
     const result = await runDueJobs();
     redirectAdmin(
       key,
-      `Jobs klaar: ${result.preferenceChecks} voorkeurschecks, ${result.hostInvites} host-mails, ${result.fallbackMails} fallback-mails.`
+      `Jobs klaar: ${result.preferenceChecks} voorkeurschecks, ${result.hostInvites} host-mails, ${result.fallbackMails} fallback-mails.`,
+      { step: "summary" }
     );
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
-      redirectAdmin(key, "Database niet bereikbaar. Automatische jobs kunnen pas met een echte database.");
+      redirectAdmin(key, "Database niet bereikbaar. Automatische jobs kunnen pas met een echte database.", {
+        step: "summary"
+      });
+    }
+
+    throw error;
+  }
+}
+
+export async function saveMailTemplateAction(formData: FormData) {
+  const key = requireAdmin(formData);
+  const type = text(formData, "type");
+  const subject = text(formData, "subject");
+  const body = text(formData, "body");
+  const definition = mailTemplateDefinition(type);
+
+  if (!definition) {
+    redirectAdmin(key, "Onbekend mailtemplate.", { step: "mails" });
+  }
+
+  if (!subject || !body) {
+    redirectAdmin(key, "Onderwerp en tekst zijn verplicht.", { step: "mails" });
+  }
+
+  try {
+    await prisma.mailTemplate.upsert({
+      where: { type },
+      create: {
+        type,
+        subject,
+        body
+      },
+      update: {
+        subject,
+        body
+      }
+    });
+    redirectAdmin(key, `${definition.label} opgeslagen.`, { step: "mails" });
+  } catch (error) {
+    if (databaseUnavailableNotice(error)) {
+      redirectAdmin(key, "Database niet bereikbaar. Mailtemplates opslaan kan pas met een echte database.", {
+        step: "mails"
+      });
     }
 
     throw error;
@@ -335,12 +453,12 @@ export async function saveAdminParticipantAction(formData: FormData) {
       : null;
 
     if (participantId && !existing) {
-      redirectAdmin(key, "Deelnemer niet gevonden.");
+      redirectAdmin(key, "Deelnemer niet gevonden.", { step: "participants", sheet: "1" });
     }
 
     const data = adminParticipantData(formData, existing || undefined);
     if (!data.name || !data.email || !data.whatsapp) {
-      redirectAdmin(key, "Naam, e-mail en WhatsApp zijn verplicht.");
+      redirectAdmin(key, "Naam, e-mail en WhatsApp zijn verplicht.", { step: "participants", sheet: "1" });
     }
 
     if (participantId) {
@@ -348,7 +466,7 @@ export async function saveAdminParticipantAction(formData: FormData) {
         where: { id: participantId },
         data
       });
-      redirectAdmin(key, `${data.name} bijgewerkt.`);
+      redirectAdmin(key, `${data.name} bijgewerkt.`, { step: "participants", sheet: "1" });
     }
 
     await prisma.participant.create({
@@ -365,10 +483,13 @@ export async function saveAdminParticipantAction(formData: FormData) {
         preferenceToken: createToken()
       }
     });
-    redirectAdmin(key, `${data.name} toegevoegd.`);
+    redirectAdmin(key, `${data.name} toegevoegd.`, { step: "participants", sheet: "1" });
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
-      redirectAdmin(key, "Database niet bereikbaar. Deelnemers bewerken kan pas met een echte database.");
+      redirectAdmin(key, "Database niet bereikbaar. Deelnemers bewerken kan pas met een echte database.", {
+        step: "participants",
+        sheet: "1"
+      });
     }
 
     throw error;
@@ -419,10 +540,10 @@ export async function cancelMatchAction(formData: FormData) {
       where: { id: matchId },
       data: { status: MatchStatus.CANCELLED }
     });
-    redirectAdmin(key, "Match geannuleerd.");
+    redirectAdmin(key, "Match geannuleerd.", { step: "review" });
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
-      redirectAdmin(key, "Database niet bereikbaar. Demo-matches kun je niet wijzigen.");
+      redirectAdmin(key, "Database niet bereikbaar. Demo-matches kun je niet wijzigen.", { step: "review" });
     }
 
     throw error;

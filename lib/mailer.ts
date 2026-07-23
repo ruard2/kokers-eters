@@ -1,7 +1,9 @@
 import type { MealMatch, MatchRound, Participant } from "@prisma/client";
 import { Resend } from "resend";
+import { adminToken } from "./admin";
 import { displayDate, displayMonth, jsonDateList, monthInputValue } from "./dates";
 import { prisma } from "./db";
+import { renderMailTemplate } from "./mail-templates";
 import { appUrl } from "./urls";
 
 type MatchWithPeople = MealMatch & {
@@ -28,10 +30,6 @@ function escapeHtml(value: string | null | undefined) {
     .replaceAll('"', "&quot;");
 }
 
-function paragraph(value: string | null | undefined, fallback = "Geen bijzonderheden opgegeven.") {
-  return `<p>${escapeHtml(value || fallback).replaceAll("\n", "<br />")}</p>`;
-}
-
 function layout(title: string, body: string) {
   return `
     <div style="font-family:Arial,sans-serif;line-height:1.55;color:#17211c;max-width:640px;margin:0 auto;padding:24px">
@@ -40,6 +38,65 @@ function layout(title: string, body: string) {
       <p style="margin-top:28px;color:#5e6b62;font-size:14px">Houvast maaltijd-randomizer</p>
     </div>
   `;
+}
+
+function fallbackText(value: string | null | undefined, fallback = "Geen bijzonderheden opgegeven.") {
+  return value?.trim() || fallback;
+}
+
+function dateText(value: unknown) {
+  const dates = jsonDateList(value);
+  return dates.length > 0 ? dates.map(displayDate).join("\n") : "spreek samen een moment af";
+}
+
+function adminUrl(params: Record<string, string>) {
+  const query = new URLSearchParams({
+    key: adminToken(),
+    ...params
+  });
+  return appUrl(`/?${query.toString()}`);
+}
+
+function participantValue(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "ja" : "nee";
+  }
+
+  return String(value);
+}
+
+function participantChanges(previous: Participant | null | undefined, next: Participant) {
+  if (!previous) {
+    return "Nieuwe aanmelding.";
+  }
+
+  const fields: Array<[keyof Participant, string]> = [
+    ["name", "Naam"],
+    ["email", "E-mail"],
+    ["whatsapp", "WhatsApp"],
+    ["mode", "Rol"],
+    ["comingWithCount", "Komt met"],
+    ["hostCapacity", "Kan ontvangen"],
+    ["eaterFrequency", "Frequentie eten"],
+    ["hostFrequency", "Frequentie koken"],
+    ["allergies", "Allergieen/dieet"],
+    ["address", "Adres"],
+    ["cannotEatDays", "Kan niet eten"],
+    ["cannotHostDays", "Kan niet koken"],
+    ["communityScope", "Kring"],
+    ["gatheringType", "Vorm"],
+    ["active", "Actief"]
+  ];
+
+  const changes = fields
+    .filter(([key]) => participantValue(previous[key]) !== participantValue(next[key]))
+    .map(([key, label]) => `${label}: ${participantValue(previous[key])} -> ${participantValue(next[key])}`);
+
+  return changes.length > 0 ? changes.join("\n") : "Geen inhoudelijke wijziging gevonden.";
 }
 
 export async function sendEmail(input: EmailInput) {
@@ -118,17 +175,17 @@ export async function sendEmail(input: EmailInput) {
 
 export async function sendWelcomeEmail(participant: Participant) {
   const preferencesUrl = appUrl(`/voorkeuren/${participant.preferenceToken}`);
+  const rendered = await renderMailTemplate("WELCOME", {
+    name: participant.name,
+    preferencesUrl
+  });
+
   return sendEmail({
     to: participant.email,
     participantId: participant.id,
     type: "WELCOME",
-    subject: "Je aanmelding voor Houvast staat erin",
-    html: layout(
-      "Je aanmelding staat erin",
-      `<p>Dankjewel, ${escapeHtml(participant.name)}. Je doet mee met de maaltijd-randomizer.</p>
-       <p>Je kunt je voorkeuren later aanpassen via deze persoonlijke link:</p>
-       <p><a href="${preferencesUrl}">${preferencesUrl}</a></p>`
-    )
+    subject: rendered.subject,
+    html: layout(rendered.title, rendered.html)
   });
 }
 
@@ -136,96 +193,90 @@ export async function sendPreferenceCheck(participant: Participant, month: Date)
   const monthKey = monthInputValue(month);
   const participateUrl = appUrl(`/meedoen/${participant.preferenceToken}?month=${monthKey}`);
   const preferencesUrl = appUrl(`/voorkeuren/${participant.preferenceToken}`);
+  const rendered = await renderMailTemplate("PREFERENCE_CHECK", {
+    name: participant.name,
+    month: displayMonth(month),
+    participateUrl,
+    preferencesUrl
+  });
 
   return sendEmail({
     to: participant.email,
     participantId: participant.id,
     type: "PREFERENCE_CHECK",
     contextKey: `preference-check:${participant.id}:${monthKey}`,
-    subject: `Doe je mee in ${displayMonth(month)}?`,
-    html: layout(
-      `Doe je mee in ${displayMonth(month)}?`,
-      `<p>Over een paar dagen maken we de nieuwe ronde. Geef kort aan of je deze ronde meedoet.</p>
-       <p><a href="${participateUrl}">Ja of nee doorgeven</a></p>
-       <p>Voorkeuren wijzigen kan hier:</p>
-       <p><a href="${preferencesUrl}">${preferencesUrl}</a></p>`
-    )
+    subject: rendered.subject,
+    html: layout(rendered.title, rendered.html)
   });
 }
 
 export async function sendHostInvite(match: MatchWithPeople) {
   const hostUrl = appUrl(`/koker/${match.hostToken}`);
   const preferencesUrl = appUrl(`/voorkeuren/${match.host.preferenceToken}`);
+  const rendered = await renderMailTemplate("HOST_INVITE", {
+    hostName: match.host.name,
+    eaterName: match.eater.name,
+    month: displayMonth(match.round.month),
+    partySize: match.partySize,
+    allergies: fallbackText(match.eater.allergies),
+    hostUrl,
+    preferencesUrl
+  });
+
   return sendEmail({
     to: match.host.email,
     participantId: match.hostId,
     matchId: match.id,
     type: "HOST_INVITE",
-    subject: `Houvast: kun je dagen kiezen voor ${match.eater.name}?`,
-    html: layout(
-      "Je bent gekoppeld als host",
-      `<p>Hoi ${escapeHtml(match.host.name)},</p>
-       <p>Voor ${displayMonth(match.round.month)} ben je gekoppeld aan ${escapeHtml(match.eater.name)} (${match.partySize} persoon/personen).</p>
-       <p><strong>Allergieën of dieetwensen:</strong></p>
-       ${paragraph(match.eater.allergies)}
-       <p>Kies via deze link welke dagen kunnen. Daarna kiest de eter daaruit de definitieve dag.</p>
-       <p><a href="${hostUrl}">${hostUrl}</a></p>
-       <p>Voorkeuren wijzigen kan hier:</p>
-       <p><a href="${preferencesUrl}">${preferencesUrl}</a></p>`
-    )
+    subject: rendered.subject,
+    html: layout(rendered.title, rendered.html)
   });
 }
 
 export async function sendEaterChoiceEmail(match: MatchWithPeople) {
   const eaterUrl = appUrl(`/eter/${match.eaterToken}`);
-  const dates = jsonDateList(match.proposedDates);
-  const dateList = dates.map((date) => `<li>${displayDate(date)}</li>`).join("");
+  const rendered = await renderMailTemplate("EATER_CHOICE", {
+    eaterName: match.eater.name,
+    hostName: match.host.name,
+    address: fallbackText(match.host.address, "Adres volgt via de host."),
+    hostNote: fallbackText(match.hostNote),
+    dates: dateText(match.proposedDates),
+    eaterUrl
+  });
 
   return sendEmail({
     to: match.eater.email,
     participantId: match.eaterId,
     matchId: match.id,
     type: "EATER_CHOICE",
-    subject: `Houvast: kies een dag bij ${match.host.name}`,
-    html: layout(
-      "Kies je definitieve dag",
-      `<p>Hoi ${escapeHtml(match.eater.name)},</p>
-       <p>Je bent gekoppeld aan ${escapeHtml(match.host.name)}.</p>
-       <p><strong>Adres:</strong><br />${escapeHtml(match.host.address || "Adres volgt via de host.")}</p>
-       <p><strong>Wat de host ongeveer maakt:</strong></p>
-       ${paragraph(match.host.cookingPlan)}
-       <p><strong>Opmerking of vraag van de host:</strong></p>
-       ${paragraph(match.hostNote)}
-       <p><strong>Mogelijke dagen:</strong></p>
-       <ul>${dateList}</ul>
-       <p>Kies via deze link de definitieve dag:</p>
-       <p><a href="${eaterUrl}">${eaterUrl}</a></p>`
-    )
+    subject: rendered.subject,
+    html: layout(rendered.title, rendered.html)
   });
 }
 
 export async function sendConfirmationEmails(match: MatchWithPeople) {
   const chosen = match.chosenDate ? displayDate(match.chosenDate) : "Nog niet gekozen";
-  const details = `
-    <p><strong>Datum:</strong> ${escapeHtml(chosen)}</p>
-    <p><strong>Host:</strong> ${escapeHtml(match.host.name)}<br />
-    ${escapeHtml(match.host.email)}<br />
-    ${escapeHtml(match.host.whatsapp)}<br />
-    ${escapeHtml(match.host.address || "")}</p>
-    <p><strong>Eter:</strong> ${escapeHtml(match.eater.name)}<br />
-    ${escapeHtml(match.eater.email)}<br />
-    ${escapeHtml(match.eater.whatsapp)}</p>
-    <p><strong>Allergieën of dieetwensen:</strong></p>
-    ${paragraph(match.eater.allergies)}
-  `;
+  const values = {
+    chosenDate: chosen,
+    hostName: match.host.name,
+    hostEmail: match.host.email,
+    hostWhatsapp: match.host.whatsapp,
+    eaterName: match.eater.name,
+    eaterEmail: match.eater.email,
+    eaterWhatsapp: match.eater.whatsapp,
+    address: fallbackText(match.host.address, "-"),
+    allergies: fallbackText(match.eater.allergies)
+  };
+  const hostRendered = await renderMailTemplate("CONFIRMATION_HOST", values);
+  const eaterRendered = await renderMailTemplate("CONFIRMATION_EATER", values);
 
   await sendEmail({
     to: match.host.email,
     participantId: match.hostId,
     matchId: match.id,
     type: "CONFIRMATION_HOST",
-    subject: `Houvast bevestigd: ${match.eater.name} komt eten`,
-    html: layout("Jullie maaltijd is bevestigd", details)
+    subject: hostRendered.subject,
+    html: layout(hostRendered.title, hostRendered.html)
   });
 
   return sendEmail({
@@ -233,41 +284,36 @@ export async function sendConfirmationEmails(match: MatchWithPeople) {
     participantId: match.eaterId,
     matchId: match.id,
     type: "CONFIRMATION_EATER",
-    subject: `Houvast bevestigd: eten bij ${match.host.name}`,
-    html: layout("Jullie maaltijd is bevestigd", details)
+    subject: eaterRendered.subject,
+    html: layout(eaterRendered.title, eaterRendered.html)
   });
 }
 
 export async function sendFallbackEmails(match: MatchWithPeople, reason: "host" | "eater") {
-  const dates = jsonDateList(match.proposedDates);
-  const dateText = dates.length > 0 ? dates.map(displayDate).join(", ") : "spreek samen een moment af";
   const reasonText =
-    reason === "host"
-      ? "De host heeft nog geen dagen gekozen."
-      : "Er is nog geen definitieve dag gekozen.";
-  const details = `
-    <p>${reasonText} Jullie zijn wel aan elkaar gekoppeld, dus neem rechtstreeks contact met elkaar op.</p>
-    <p><strong>Mogelijke dagen:</strong> ${escapeHtml(dateText)}</p>
-    <p><strong>Host:</strong><br />
-    ${escapeHtml(match.host.name)}<br />
-    ${escapeHtml(match.host.email)}<br />
-    ${escapeHtml(match.host.whatsapp)}<br />
-    ${escapeHtml(match.host.address || "")}</p>
-    <p><strong>Eter:</strong><br />
-    ${escapeHtml(match.eater.name)}<br />
-    ${escapeHtml(match.eater.email)}<br />
-    ${escapeHtml(match.eater.whatsapp)}</p>
-    <p><strong>Allergieën of dieetwensen:</strong></p>
-    ${paragraph(match.eater.allergies)}
-  `;
+    reason === "host" ? "De host heeft nog geen dagen gekozen." : "Er is nog geen definitieve dag gekozen.";
+  const values = {
+    reasonText,
+    dates: dateText(match.proposedDates),
+    hostName: match.host.name,
+    hostEmail: match.host.email,
+    hostWhatsapp: match.host.whatsapp,
+    eaterName: match.eater.name,
+    eaterEmail: match.eater.email,
+    eaterWhatsapp: match.eater.whatsapp,
+    address: fallbackText(match.host.address, "-"),
+    allergies: fallbackText(match.eater.allergies)
+  };
+  const hostRendered = await renderMailTemplate("FALLBACK_HOST", values);
+  const eaterRendered = await renderMailTemplate("FALLBACK_EATER", values);
 
   await sendEmail({
     to: match.host.email,
     participantId: match.hostId,
     matchId: match.id,
     type: "FALLBACK_HOST",
-    subject: `Houvast: neem contact op met ${match.eater.name}`,
-    html: layout("Jullie zijn gekoppeld", details)
+    subject: hostRendered.subject,
+    html: layout(hostRendered.title, hostRendered.html)
   });
 
   return sendEmail({
@@ -275,7 +321,58 @@ export async function sendFallbackEmails(match: MatchWithPeople, reason: "host" 
     participantId: match.eaterId,
     matchId: match.id,
     type: "FALLBACK_EATER",
-    subject: `Houvast: neem contact op met ${match.host.name}`,
-    html: layout("Jullie zijn gekoppeld", details)
+    subject: eaterRendered.subject,
+    html: layout(eaterRendered.title, eaterRendered.html)
+  });
+}
+
+export async function sendAdminParticipantNotice(
+  participant: Participant,
+  action: "created" | "updated",
+  previous?: Participant | null
+) {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) {
+    return { status: "skipped_no_admin_email" };
+  }
+
+  const actionLabel = action === "created" ? "Nieuwe aanmelding" : "Wijziging in aanmelding";
+  const rendered = await renderMailTemplate("ADMIN_PARTICIPANT_NOTICE", {
+    actionLabel,
+    name: participant.name,
+    email: participant.email,
+    whatsapp: participant.whatsapp,
+    changes: participantChanges(previous, participant),
+    adminEditUrl: adminUrl({ step: "participants", sheet: "1" }),
+    adminOkUrl: adminUrl({ step: "summary" })
+  });
+
+  return sendEmail({
+    to: adminEmail,
+    participantId: participant.id,
+    type: "ADMIN_PARTICIPANT_NOTICE",
+    contextKey: `admin-participant:${participant.id}:${participant.updatedAt.getTime()}`,
+    subject: rendered.subject,
+    html: layout(rendered.title, rendered.html)
+  });
+}
+
+export async function sendAdminRenewalReminder(month: Date) {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) {
+    return { status: "skipped_no_admin_email" };
+  }
+
+  const monthKey = monthInputValue(month);
+  const rendered = await renderMailTemplate("ADMIN_RENEWAL_REMINDER", {
+    adminUrl: adminUrl({ step: "planning" })
+  });
+
+  return sendEmail({
+    to: adminEmail,
+    type: "ADMIN_RENEWAL_REMINDER",
+    contextKey: `admin-renewal:${monthKey}`,
+    subject: rendered.subject,
+    html: layout(rendered.title, rendered.html)
   });
 }

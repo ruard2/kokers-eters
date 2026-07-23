@@ -67,6 +67,7 @@ Zet daarna deze variabelen op de app-service:
 - `DATABASE_URL`
 - `APP_URL`
 - `ADMIN_TOKEN`
+- `ADMIN_EMAIL`
 - `CRON_SECRET`
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
@@ -75,6 +76,7 @@ Zet daarna deze variabelen op de app-service:
 - optioneel: `REQUIRE_DATABASE_MIGRATIONS`
 
 Gebruik de `DATABASE_URL` van Railway PostgreSQL. `APP_URL` moet de publieke Railway URL van de app zijn, bijvoorbeeld `https://kokers-eters-production.up.railway.app`.
+`ADMIN_EMAIL` krijgt meldingen over nieuwe of gewijzigde aanmeldingen en reminders om nieuwe rondes klaar te zetten.
 
 ### Poort (belangrijk, dit veroorzaakt 502)
 

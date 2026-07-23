@@ -2,19 +2,27 @@ import { MatchStatus, RoundStatus } from "@prisma/client";
 import { addDays, addMonths, toMonthStart } from "./dates";
 import { prisma } from "./db";
 import {
+  sendAdminRenewalReminder,
   sendFallbackEmails,
   sendHostInvite,
   sendPreferenceCheck
 } from "./mailer";
 import { generateRoundForMonth } from "./matching";
 
-const staleAfterMs = 3 * 24 * 60 * 60 * 1000;
-
 const matchInclude = {
   host: true,
   eater: true,
   round: true
 } as const;
+
+async function reminderDaysAfter() {
+  const settings = await prisma.planningSettings.findUnique({
+    where: { id: "default" },
+    select: { reminderDaysAfter: true }
+  });
+
+  return settings?.reminderDaysAfter || 3;
+}
 
 export async function sendPreferenceChecksForMonth(month: Date) {
   const participants = await prisma.participant.findMany({
@@ -65,7 +73,7 @@ export async function sendHostInvitesForRound(roundId?: string) {
 }
 
 export async function sendFallbacksForStaleMatches() {
-  const cutoff = new Date(Date.now() - staleAfterMs);
+  const cutoff = new Date(Date.now() - (await reminderDaysAfter()) * 24 * 60 * 60 * 1000);
   const staleHostMatches = await prisma.mealMatch.findMany({
     where: {
       status: MatchStatus.HOST_INVITED,
@@ -138,11 +146,18 @@ export async function runDueJobs() {
   }
 
   const fallbackMails = await sendFallbacksForStaleMatches();
+  const futureRounds = await prisma.matchRound.count({
+    where: {
+      month: { gte: nextMonth }
+    }
+  });
+  const adminReminder = futureRounds === 0 ? await sendAdminRenewalReminder(currentMonth) : null;
 
   return {
     preferenceChecks,
     generatedRound,
     hostInvites,
-    fallbackMails
+    fallbackMails,
+    adminReminder
   };
 }

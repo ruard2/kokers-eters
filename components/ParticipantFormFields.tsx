@@ -5,6 +5,7 @@ import {
   ParticipationMode,
   type Participant
 } from "@prisma/client";
+import { UnavailableDaysField } from "./UnavailableDaysField";
 
 type Props = {
   participant?: Participant;
@@ -147,13 +148,13 @@ export function ParticipantFormFields({ participant, showActive = false }: Props
           </select>
         </label>
         <label>
-          Allergieën of dieetwensen
+          Allergieen of dieetwensen
           <textarea name="allergies" rows={4} defaultValue={value(participant, "allergies")} />
         </label>
-        <label>
-          Dagen waarop je niet kunt eten
-          <textarea name="cannotEatDays" rows={3} defaultValue={value(participant, "cannotEatDays")} />
-        </label>
+        <div className="day-field">
+          <span className="label">Dagen waarop je niet kunt eten</span>
+          <UnavailableDaysField name="cannotEatDays" defaultValue={value(participant, "cannotEatDays")} />
+        </div>
       </section>
 
       <section className="form-section">
@@ -174,14 +175,10 @@ export function ParticipantFormFields({ participant, showActive = false }: Props
           Adres
           <textarea name="address" rows={3} defaultValue={value(participant, "address")} />
         </label>
-        <label>
-          Dagen waarop je niet kunt koken
-          <textarea name="cannotHostDays" rows={3} defaultValue={value(participant, "cannotHostDays")} />
-        </label>
-        <label>
-          Wat kook je ongeveer?
-          <textarea name="cookingPlan" rows={3} defaultValue={value(participant, "cookingPlan")} />
-        </label>
+        <div className="day-field">
+          <span className="label">Dagen waarop je niet kunt ontvangen</span>
+          <UnavailableDaysField name="cannotHostDays" defaultValue={value(participant, "cannotHostDays")} />
+        </div>
       </section>
     </>
   );

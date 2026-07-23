@@ -46,10 +46,6 @@ export default async function EaterPage({ params, searchParams }: PageProps) {
             <strong>{match.host.address || "Adres volgt via de host"}</strong>
           </div>
           <div>
-            <span className="label">Wat ongeveer</span>
-            <strong>{match.host.cookingPlan || "Nog niet ingevuld"}</strong>
-          </div>
-          <div>
             <span className="label">Opmerking host</span>
             <strong>{match.hostNote || "Geen opmerking"}</strong>
           </div>

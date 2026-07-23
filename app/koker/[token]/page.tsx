@@ -58,10 +58,6 @@ export default async function HostPage({ params, searchParams }: PageProps) {
         <form action={submitHostDates} className="stack">
           <input type="hidden" name="token" value={token} />
           <label>
-            Wat kook je ongeveer?
-            <textarea name="cookingPlan" rows={3} defaultValue={match.host.cookingPlan || ""} />
-          </label>
-          <label>
             Vraag of opmerking voor de eter
             <textarea name="hostNote" rows={3} defaultValue={match.hostNote || ""} />
           </label>
