@@ -99,6 +99,36 @@ De database-migraties draaien in Railway via de pre-deploy stap als `DATABASE_UR
 2. Open Settings → Networking → Public Networking en kijk naar de target port achter de domain (het `→ Port ...` label).
 3. Zorg dat beide getallen gelijk zijn. Pas het target-port veld aan (direct effect, geen redeploy nodig) óf zet de `PORT` variable gelijk aan de target port (redeploy nodig).
 
+## Testdata seeden (20 deelnemers)
+
+Er zitten 20 test-deelnemers in `lib/seed.ts` (mix van hosts, eters en allebei). De seed maakt ook een concept-ronde voor volgende maand aan met matches in verschillende statussen, zodat je de hele flow kunt testen. Alle test-accounts gebruiken een `@houvast.local` e-mailadres; de seed verwijdert alleen die accounts opnieuw, plus bestaande rondes/matches/mails.
+
+### Op Railway (aanbevolen)
+
+De Railway-database (`postgres.railway.internal`) is alleen binnen Railway bereikbaar, dus seed je via een endpoint die ín de container draait:
+
+1. Zet op de app-service de variable `ALLOW_DEMO_SEED=true` (en zorg dat `CRON_SECRET` gezet is).
+2. Open na de redeploy in de browser:
+
+   ```text
+   https://jouw-app/api/seed?secret=CRON_SECRET
+   ```
+
+   Vervang `CRON_SECRET` door de waarde van je `CRON_SECRET`. Je krijgt JSON terug met het aantal deelnemers en matches.
+3. Zet daarna `ALLOW_DEMO_SEED=false` (of verwijder de variable) zodat de seed-endpoint weer uit staat.
+
+De endpoint geeft `403` als `ALLOW_DEMO_SEED` niet op `true` staat en `401` bij een verkeerd secret.
+
+### Lokaal
+
+```bash
+docker compose up -d
+npm run db:push
+npm run seed:demo
+```
+
+Of lokaal tegen de Railway-database: kopieer in Railway de **publieke** connectiestring van de Postgres-service (host `...proxy.rlwy.net`, niet `...railway.internal`), zet die als `DATABASE_URL` en draai `npm run seed:demo`.
+
 ## Automatische jobs
 
 Laat Railway periodiek deze URL aanroepen:
