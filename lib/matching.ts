@@ -206,19 +206,27 @@ function addCurrentRole(currentRoles: Map<string, Set<Role>>, participantId: str
   currentRoles.set(participantId, roles);
 }
 
-export async function generateRoundForMonth(rawMonth: Date) {
+export async function generateRoundForMonth(
+  rawMonth: Date,
+  organizationId: string | null = null
+) {
   const month = toMonthStart(rawMonth);
-  const existingRound = await prisma.matchRound.findUnique({ where: { month } });
+  const existingRound = await prisma.matchRound.findFirst({
+    where: { month, organizationId }
+  });
 
   if (existingRound && existingRound.status !== RoundStatus.DRAFT) {
     throw new Error("Deze ronde is al verstuurd. Maak een nieuwe ronde of annuleer matches handmatig.");
   }
 
-  const round = await prisma.matchRound.upsert({
-    where: { month },
-    create: { month, status: RoundStatus.DRAFT },
-    update: { status: RoundStatus.DRAFT }
-  });
+  const round = existingRound
+    ? await prisma.matchRound.update({
+        where: { id: existingRound.id },
+        data: { status: RoundStatus.DRAFT }
+      })
+    : await prisma.matchRound.create({
+        data: { month, organizationId, status: RoundStatus.DRAFT }
+      });
 
   await prisma.mealMatch.deleteMany({
     where: {
@@ -235,6 +243,7 @@ export async function generateRoundForMonth(rawMonth: Date) {
 
   const participants = await prisma.participant.findMany({
     where: {
+      organizationId,
       active: true,
       id: { notIn: [...optedOut] }
     },

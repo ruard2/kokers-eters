@@ -82,8 +82,8 @@ export async function runDueJobs() {
   }
 
   if (process.env.AUTO_GENERATE_ROUNDS === "true") {
-    const existing = await prisma.matchRound.findUnique({
-      where: { month: currentMonth }
+    const existing = await prisma.matchRound.findFirst({
+      where: { month: currentMonth, organizationId: null }
     });
 
     if (!existing) {

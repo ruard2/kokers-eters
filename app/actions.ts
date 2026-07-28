@@ -129,14 +129,21 @@ export async function registerParticipant(formData: FormData) {
     redirect("/aanmelden?error=address");
   }
 
-  const participant = await prisma.participant.upsert({
-    where: { email: data.email },
-    create: {
-      ...data,
-      preferenceToken: createToken()
-    },
-    update: data
+  const existingParticipant = await prisma.participant.findFirst({
+    where: { email: data.email, organizationId: null }
   });
+  const participant = existingParticipant
+    ? await prisma.participant.update({
+        where: { id: existingParticipant.id },
+        data
+      })
+    : await prisma.participant.create({
+        data: {
+          ...data,
+          organizationId: null,
+          preferenceToken: createToken()
+        }
+      });
 
   await sendWelcomeEmail(participant);
   redirect(`/bedankt?token=${participant.preferenceToken}`);
@@ -490,20 +497,19 @@ export async function saveMailTemplateAction(formData: FormData) {
   }
 
   try {
-    await prisma.mailTemplate.upsert({
-      where: { type },
-      create: {
-        type,
-        subject,
-        body,
-        enabled
-      },
-      update: {
-        subject,
-        body,
-        enabled
-      }
+    const existingTemplate = await prisma.mailTemplate.findFirst({
+      where: { type, organizationId: null }
     });
+    if (existingTemplate) {
+      await prisma.mailTemplate.update({
+        where: { id: existingTemplate.id },
+        data: { subject, body, enabled }
+      });
+    } else {
+      await prisma.mailTemplate.create({
+        data: { type, subject, body, enabled, organizationId: null }
+      });
+    }
     redirectAdmin(key, `${definition.label} ${enabled ? "staat aan en is opgeslagen" : "staat uit en is opgeslagen"}.`, {
       step: "mails"
     });

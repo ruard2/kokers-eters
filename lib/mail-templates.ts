@@ -261,14 +261,18 @@ export function plainTextToHtml(value: string) {
     .join("");
 }
 
-export async function renderMailTemplate(type: MailTemplateType, values: TemplateValues) {
+export async function renderMailTemplate(
+  type: MailTemplateType,
+  values: TemplateValues,
+  organizationId: string | null = null
+) {
   const definition = mailTemplateDefinition(type);
   if (!definition) {
     throw new Error(`Onbekend mailtemplate: ${type}`);
   }
 
-  const saved = await prisma.mailTemplate.findUnique({
-    where: { type }
+  const saved = await prisma.mailTemplate.findFirst({
+    where: { type, organizationId }
   });
   const subject = replaceTemplateValues(saved?.subject || definition.subject, values);
   const title = replaceTemplateValues(definition.title, values);
