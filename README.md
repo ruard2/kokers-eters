@@ -2,6 +2,30 @@
 
 Een simpele maaltijd-randomizer voor contact binnen de kerkgemeenschap.
 
+## Optionele Community Tools-koppeling
+
+De bestaande website, adminsleutel en deelnemerslinks blijven zelfstandig
+werken. Community Tools is een aanvullende, standaard uitgeschakelde route.
+Na activering wisselt `/api/community-tools/sso` een eenmalig ticket
+server-to-server om. Iedere centrale organisatie krijgt volledig gescheiden
+deelnemers, rondes, matches, instellingen en mailtemplates.
+
+Benodigde variabelen:
+
+```env
+COMMUNITY_TOOLS_SSO_ENABLED=true
+COMMUNITY_TOOLS_URL=https://www.communitytools.online
+COMMUNITY_TOOLS_CLIENT_ID=ct_shared_meals
+COMMUNITY_TOOLS_CLIENT_SECRET=<door Community Tools uitgegeven secret>
+COMMUNITY_TOOLS_SESSION_SECRET=<minstens 32 willekeurige bytes>
+```
+
+Zet in Community Tools:
+
+```env
+SHARED_MEALS_LAUNCH_URL=https://<kokers-en-eters-domein>/api/community-tools/sso
+```
+
 ## Wat zit erin
 
 - Intakeformulier zonder account

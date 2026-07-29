@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runDueJobs } from "@/lib/automation";
+import { runDueJobsForAllOrganizations } from "@/lib/automation";
 
 export const runtime = "nodejs";
 
@@ -12,7 +12,7 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const result = await runDueJobs();
+  const result = await runDueJobsForAllOrganizations();
   return NextResponse.json(result);
 }
 

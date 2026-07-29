@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "test": "tsx --test tests/*.test.ts",
     "start": "node scripts/start.mjs",
     "migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",

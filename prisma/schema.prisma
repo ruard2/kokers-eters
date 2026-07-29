@@ -47,10 +47,40 @@ enum MatchStatus {
   CANCELLED
 }
 
+model Organization {
+  id                       String   @id @default(cuid())
+  communityToolsId         String   @unique
+  name                     String
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  accounts         CommunityToolsAccount[]
+  participants     Participant[]
+  rounds           MatchRound[]
+  planningSettings PlanningSettings[]
+  mailTemplates    MailTemplate[]
+}
+
+model CommunityToolsAccount {
+  id                   String   @id @default(cuid())
+  communityToolsUserId String   @unique
+  organizationId       String
+  email                String
+  name                 String
+  role                 String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
 model Participant {
   id               String            @id @default(cuid())
+  organizationId   String?
   name             String
-  email            String            @unique
+  email            String
   whatsapp         String
   mode             ParticipationMode @default(BOTH)
   comingWithCount  Int               @default(1)
@@ -75,20 +105,30 @@ model Participant {
   eatenMatches  MealMatch[]  @relation("EaterMatches")
   optOuts       RoundOptOut[]
   emailLogs     EmailLog[]
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
 }
 
 model MatchRound {
   id        String      @id @default(cuid())
-  month     DateTime    @unique
+  organizationId String?
+  month     DateTime
   status    RoundStatus @default(DRAFT)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
   matches MealMatch[]
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, month])
+  @@index([organizationId])
 }
 
 model PlanningSettings {
   id                   String   @id @default("default")
+  organizationId       String?
   horizonMonths        Int      @default(1)
   adminCheckDaysBefore Int      @default(14)
   hostMailDaysBefore   Int      @default(21)
@@ -97,6 +137,10 @@ model PlanningSettings {
   renewalCadence       String   @default("YEAR")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId])
 }
 
 model MealMatch {
@@ -133,12 +177,18 @@ model MealMatch {
 
 model MailTemplate {
   id        String   @id @default(cuid())
-  type      String   @unique
+  organizationId String?
+  type      String
   subject   String
   body      String
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, type])
+  @@index([organizationId])
 }
 
 model RoundOptOut {

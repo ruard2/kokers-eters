@@ -14,7 +14,7 @@ import {
 import { AdminMatchBoard, type BoardMatch, type BoardRosterParticipant } from "@/components/AdminMatchBoard";
 import { CopyButton } from "@/components/CopyButton";
 import { CopyQrButton } from "@/components/CopyQrButton";
-import { demoSeedEnabled, isAdminKey } from "@/lib/admin";
+import { demoSeedEnabled, resolveAdminContext } from "@/lib/admin";
 import { addMonths, displayDate, displayMonth, jsonDateList, monthInputValue, parseMonthInput, toMonthStart } from "@/lib/dates";
 import { demoAdminData } from "@/lib/demo-data";
 import { prisma } from "@/lib/db";
@@ -1056,7 +1056,8 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const currentStep = activeStep(query.step);
   const showSheet = first(query.sheet) === "1";
 
-  if (!isAdminKey(key)) {
+  const adminContext = resolveAdminContext(key);
+  if (!adminContext) {
     return (
       <div className="page narrow">
         <section className="panel centered">
@@ -1073,6 +1074,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
       </div>
     );
   }
+  const organizationId = adminContext.organizationId;
 
   let usingDemoData = false;
   let participants: Participant[];
@@ -1091,16 +1093,45 @@ export default async function AdminPage({ searchParams }: PageProps) {
       settingsRow,
       templateRows
     ] = await Promise.all([
-      prisma.participant.findMany({ orderBy: { createdAt: "asc" }, take: 120 }),
-      prisma.matchRound.findMany({ orderBy: { month: "asc" }, take: 36, include: { matches: true } }),
+      prisma.participant.findMany({
+        where: { organizationId },
+        orderBy: { createdAt: "asc" },
+        take: 120
+      }),
+      prisma.matchRound.findMany({
+        where: { organizationId },
+        orderBy: { month: "asc" },
+        take: 36,
+        include: { matches: true }
+      }),
       prisma.mealMatch.findMany({
+        where: { round: { organizationId } },
         orderBy: { createdAt: "desc" },
         take: 120,
         include: { host: true, eater: true, round: true }
       }),
-      prisma.emailLog.findMany({ orderBy: { createdAt: "desc" }, take: 30 }),
-      prisma.planningSettings.findUnique({ where: { id: "default" } }),
-      prisma.mailTemplate.findMany({ orderBy: { type: "asc" } })
+      prisma.emailLog.findMany({
+        where: organizationId
+          ? {
+              OR: [
+                { participant: { organizationId } },
+                { match: { round: { organizationId } } }
+              ]
+            }
+          : {
+              OR: [
+                { participant: { organizationId: null } },
+                { match: { round: { organizationId: null } } }
+              ]
+            },
+        orderBy: { createdAt: "desc" },
+        take: 30
+      }),
+      prisma.planningSettings.findFirst({ where: { organizationId } }),
+      prisma.mailTemplate.findMany({
+        where: { organizationId },
+        orderBy: { type: "asc" }
+      })
     ]);
     participants = participantRows;
     rounds = roundRows;
@@ -1117,7 +1148,9 @@ export default async function AdminPage({ searchParams }: PageProps) {
     emailLogs = demo.emailLogs as unknown as EmailLog[];
   }
 
-  const signupUrl = appUrl("/aanmelden");
+  const signupUrl = organizationId
+    ? appUrl(`/aanmelden?organization=${encodeURIComponent(organizationId)}`)
+    : appUrl("/aanmelden");
   const queryStartMonth = first(query.startMonth);
   const defaultMonth =
     queryStartMonth && /^\d{4}-\d{2}$/.test(queryStartMonth) ? queryStartMonth : monthInputValue(toMonthStart(new Date()));
