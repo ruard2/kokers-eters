@@ -62,4 +62,6 @@ test("Community Tools callback only accepts the shared meals product", async () 
   assert.match(integration, /COMMUNITY_TOOLS_SSO_ENABLED/);
   assert.match(callback, /communityToolsAccount\.upsert/);
   assert.match(callback, /createCommunityToolsAdminKey/);
+  assert.match(callback, /appUrl\(`\/\?key=/);
+  assert.doesNotMatch(callback, /new URL\([^)]*request\.url/);
 });

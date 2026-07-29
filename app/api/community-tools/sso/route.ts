@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createCommunityToolsAdminKey } from "@/lib/admin";
 import { exchangeCommunityToolsTicket } from "@/lib/community-tools";
 import { prisma } from "@/lib/db";
+import { appUrl } from "@/lib/urls";
 
 export async function GET(request: NextRequest) {
   const ticket = request.nextUrl.searchParams.get("ct_ticket") || "";
@@ -38,12 +39,16 @@ export async function GET(request: NextRequest) {
       userId: context.user.id
     });
     return NextResponse.redirect(
-      new URL(`/?key=${encodeURIComponent(key)}`, request.url),
+      appUrl(`/?key=${encodeURIComponent(key)}`),
       303
     );
-  } catch {
+  } catch (error) {
+    console.error(
+      "[community-tools-sso]",
+      error instanceof Error ? error.message : "Onbekende SSO-fout"
+    );
     return NextResponse.redirect(
-      new URL("/?error=community-tools", request.url),
+      appUrl("/?error=community-tools"),
       303
     );
   }
