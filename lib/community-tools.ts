@@ -1,8 +1,7 @@
 type CommunityToolsContext = {
   user: { id: string; email: string; name?: string };
-  organization: { id: string; name: string };
-  membership: { role: string };
-  product: { code: string };
+  organization: { id: string; name: string; role: string };
+  product: { code: string; role: string };
 };
 
 export function communityToolsEnabled() {
@@ -40,7 +39,7 @@ export async function exchangeCommunityToolsTicket(
     !context.user?.email ||
     !context.organization?.id ||
     !context.organization?.name ||
-    !["owner", "admin"].includes(context.membership?.role)
+    !["owner", "admin"].includes(context.organization?.role)
   ) {
     throw new Error("Onvolledige Community Tools-context.");
   }

@@ -24,13 +24,13 @@ export async function GET(request: NextRequest) {
         organizationId: organization.id,
         email: context.user.email.toLowerCase(),
         name: context.user.name || context.user.email,
-        role: context.membership.role
+        role: context.organization.role
       },
       update: {
         organizationId: organization.id,
         email: context.user.email.toLowerCase(),
         name: context.user.name || context.user.email,
-        role: context.membership.role
+        role: context.organization.role
       }
     });
 
