@@ -10,9 +10,12 @@ const matchInclude = {
   round: true
 } as const;
 
-export async function sendPreferenceChecksForMonth(month: Date) {
+export async function sendPreferenceChecksForMonth(
+  month: Date,
+  organizationId: string | null = null
+) {
   const participants = await prisma.participant.findMany({
-    where: { active: true },
+    where: { active: true, organizationId },
     orderBy: { name: "asc" }
   });
 
@@ -27,10 +30,14 @@ export async function sendPreferenceChecksForMonth(month: Date) {
   return sent;
 }
 
-export async function sendHostInvitesForRound(roundId?: string) {
+export async function sendHostInvitesForRound(
+  roundId?: string,
+  organizationId: string | null = null
+) {
   const matches = await prisma.mealMatch.findMany({
     where: {
       roundId,
+      round: { organizationId },
       status: MatchStatus.DRAFT
     },
     include: matchInclude,
@@ -55,8 +62,8 @@ export async function sendHostInvitesForRound(roundId?: string) {
   }
 
   if (roundId && sent > 0) {
-    await prisma.matchRound.update({
-      where: { id: roundId },
+    await prisma.matchRound.updateMany({
+      where: { id: roundId, organizationId },
       data: { status: RoundStatus.HOST_MAILS_SENT }
     });
   }
@@ -68,8 +75,10 @@ export async function sendFallbacksForStaleMatches() {
   return 0;
 }
 
-export async function runDueJobs() {
-  const now = new Date();
+export async function runDueJobs(
+  now = new Date(),
+  organizationId: string | null = null
+) {
   const currentMonth = toMonthStart(now);
   const nextMonth = addMonths(currentMonth, 1);
   const preferenceWindowStart = addDays(nextMonth, -3);
@@ -78,20 +87,26 @@ export async function runDueJobs() {
   let hostInvites = 0;
 
   if (now >= preferenceWindowStart && now < nextMonth) {
-    preferenceChecks = await sendPreferenceChecksForMonth(nextMonth);
+    preferenceChecks = await sendPreferenceChecksForMonth(
+      nextMonth,
+      organizationId
+    );
   }
 
   if (process.env.AUTO_GENERATE_ROUNDS === "true") {
     const existing = await prisma.matchRound.findFirst({
-      where: { month: currentMonth, organizationId: null }
+      where: { month: currentMonth, organizationId }
     });
 
     if (!existing) {
-      generatedRound = await generateRoundForMonth(currentMonth);
+      generatedRound = await generateRoundForMonth(currentMonth, organizationId);
     }
 
     if (process.env.AUTO_SEND_ROUNDS === "true") {
-      hostInvites = await sendHostInvitesForRound(existing?.id || generatedRound?.roundId);
+      hostInvites = await sendHostInvitesForRound(
+        existing?.id || generatedRound?.roundId,
+        organizationId
+      );
     }
   }
 
@@ -101,4 +116,22 @@ export async function runDueJobs() {
     hostInvites,
     fallbackMails: 0
   };
+}
+
+export async function runDueJobsForAllOrganizations(now = new Date()) {
+  const organizations = await prisma.organization.findMany({
+    select: { id: true }
+  });
+  const scopes: Array<string | null> = [
+    null,
+    ...organizations.map((organization) => organization.id)
+  ];
+  const results = [];
+  for (const organizationId of scopes) {
+    results.push({
+      organizationId,
+      result: await runDueJobs(now, organizationId)
+    });
+  }
+  return { organizations: results };
 }

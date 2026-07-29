@@ -127,7 +127,7 @@ export async function sendWelcomeEmail(participant: Participant) {
   const rendered = await renderMailTemplate("WELCOME", {
     name: participant.name,
     preferencesUrl
-  });
+  }, participant.organizationId);
 
   if (!rendered.enabled) {
     return { status: "skipped_disabled" };
@@ -151,7 +151,7 @@ export async function sendPreferenceCheck(participant: Participant, month: Date)
     month: displayMonth(month),
     participateUrl,
     preferencesUrl
-  });
+  }, participant.organizationId);
 
   if (!rendered.enabled) {
     return { status: "skipped_disabled" };
@@ -180,7 +180,7 @@ export async function sendHostInvite(match: MatchWithPeople) {
     allergies: fallbackText(match.eater.allergies),
     hostUrl,
     preferencesUrl
-  });
+  }, match.host.organizationId);
 
   if (!rendered.enabled) {
     return { status: "skipped_disabled" };
@@ -207,7 +207,7 @@ export async function sendEaterChoiceEmail(match: MatchWithPeople) {
     hostNote: fallbackText(match.hostNote),
     dates: dateText(match.proposedDates),
     eaterUrl
-  });
+  }, match.eater.organizationId);
 
   if (!rendered.enabled) {
     return { status: "skipped_disabled" };
@@ -236,8 +236,16 @@ export async function sendConfirmationEmails(match: MatchWithPeople) {
     address: fallbackText(match.host.address, "-"),
     allergies: fallbackText(match.eater.allergies)
   };
-  const hostRendered = await renderMailTemplate("CONFIRMATION_HOST", values);
-  const eaterRendered = await renderMailTemplate("CONFIRMATION_EATER", values);
+  const hostRendered = await renderMailTemplate(
+    "CONFIRMATION_HOST",
+    values,
+    match.host.organizationId
+  );
+  const eaterRendered = await renderMailTemplate(
+    "CONFIRMATION_EATER",
+    values,
+    match.eater.organizationId
+  );
 
   if (hostRendered.enabled) {
     await sendEmail({
@@ -279,8 +287,16 @@ export async function sendFallbackEmails(match: MatchWithPeople, reason: "host" 
     address: fallbackText(match.host.address, "-"),
     allergies: fallbackText(match.eater.allergies)
   };
-  const hostRendered = await renderMailTemplate("FALLBACK_HOST", values);
-  const eaterRendered = await renderMailTemplate("FALLBACK_EATER", values);
+  const hostRendered = await renderMailTemplate(
+    "FALLBACK_HOST",
+    values,
+    match.host.organizationId
+  );
+  const eaterRendered = await renderMailTemplate(
+    "FALLBACK_EATER",
+    values,
+    match.eater.organizationId
+  );
 
   if (hostRendered.enabled) {
     await sendEmail({

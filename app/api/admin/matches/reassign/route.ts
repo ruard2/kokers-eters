@@ -1,6 +1,6 @@
 import { MatchStatus, Prisma, type Participant } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { isAdminKey } from "@/lib/admin";
+import { resolveAdminContext } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 
 const matchInclude = {
@@ -179,7 +179,11 @@ export async function POST(request: Request) {
     return badRequest("Ongeldige aanvraag.");
   }
 
-  if (typeof body.adminKey !== "string" || !isAdminKey(body.adminKey)) {
+  const admin =
+    typeof body.adminKey === "string"
+      ? resolveAdminContext(body.adminKey)
+      : null;
+  if (!admin) {
     return badRequest("Ongeldige admin-sleutel.", 401);
   }
 
@@ -196,10 +200,18 @@ export async function POST(request: Request) {
   }
 
   const selectedMatches = await prisma.mealMatch.findMany({
-    where: { id: { in: [body.sourceMatchId, body.targetMatchId] } },
+    where: {
+      id: { in: [body.sourceMatchId, body.targetMatchId] },
+      round: { organizationId: admin.organizationId }
+    },
     include: matchInclude
   });
-  const adminNoMatch = buildAdminNoMatchMap(await prisma.participant.findMany({ orderBy: { createdAt: "asc" } }));
+  const adminNoMatch = buildAdminNoMatchMap(
+    await prisma.participant.findMany({
+      where: { organizationId: admin.organizationId },
+      orderBy: { createdAt: "asc" }
+    })
+  );
 
   if (selectedMatches.length !== 2) {
     return badRequest("Match niet gevonden.", 404);

@@ -1,0 +1,50 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createCommunityToolsAdminKey } from "@/lib/admin";
+import { exchangeCommunityToolsTicket } from "@/lib/community-tools";
+import { prisma } from "@/lib/db";
+
+export async function GET(request: NextRequest) {
+  const ticket = request.nextUrl.searchParams.get("ct_ticket") || "";
+
+  try {
+    const context = await exchangeCommunityToolsTicket(ticket);
+    const organization = await prisma.organization.upsert({
+      where: { communityToolsId: context.organization.id },
+      create: {
+        communityToolsId: context.organization.id,
+        name: context.organization.name
+      },
+      update: { name: context.organization.name }
+    });
+    await prisma.communityToolsAccount.upsert({
+      where: { communityToolsUserId: context.user.id },
+      create: {
+        communityToolsUserId: context.user.id,
+        organizationId: organization.id,
+        email: context.user.email.toLowerCase(),
+        name: context.user.name || context.user.email,
+        role: context.membership.role
+      },
+      update: {
+        organizationId: organization.id,
+        email: context.user.email.toLowerCase(),
+        name: context.user.name || context.user.email,
+        role: context.membership.role
+      }
+    });
+
+    const key = createCommunityToolsAdminKey({
+      organizationId: organization.id,
+      userId: context.user.id
+    });
+    return NextResponse.redirect(
+      new URL(`/?key=${encodeURIComponent(key)}`, request.url),
+      303
+    );
+  } catch {
+    return NextResponse.redirect(
+      new URL("/?error=community-tools", request.url),
+      303
+    );
+  }
+}

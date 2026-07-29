@@ -2,7 +2,7 @@
 
 import { CommunityScope, Frequency, GatheringType, MatchStatus, ParticipationMode, Prisma, RoundStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
-import { demoSeedEnabled, isAdminKey } from "@/lib/admin";
+import { demoSeedEnabled, resolveAdminContext } from "@/lib/admin";
 import { runDueJobs, sendHostInvitesForRound, sendPreferenceChecksForMonth } from "@/lib/automation";
 import { addMonths, dateInputToDate, jsonDateList, monthInputValue, parseMonthInput } from "@/lib/dates";
 import {
@@ -76,11 +76,12 @@ function dateList(formData: FormData) {
 
 function requireAdmin(formData: FormData) {
   const key = text(formData, "adminKey");
-  if (!isAdminKey(key)) {
+  const context = resolveAdminContext(key);
+  if (!context) {
     throw new Error("Ongeldige admin-sleutel.");
   }
 
-  return key;
+  return context;
 }
 
 function redirectAdmin(key: string, notice: string, params: Record<string, string> = {}): never {
@@ -120,17 +121,24 @@ function adminParticipantData(formData: FormData, existing?: { eaterFrequency: F
 
 export async function registerParticipant(formData: FormData) {
   const data = participantFormData(formData, true);
-
+  const requestedOrganizationId = text(formData, "organizationId") || null;
+  const organization = requestedOrganizationId
+    ? await prisma.organization.findUnique({
+        where: { id: requestedOrganizationId },
+        select: { id: true }
+      })
+    : null;
+  const organizationId = organization?.id || null;
   if (!data.name || !data.email || !data.whatsapp) {
-    redirect("/aanmelden?error=missing");
+    redirect(`/aanmelden?error=missing${organizationId ? `&organization=${encodeURIComponent(organizationId)}` : ""}`);
   }
 
   if (data.mode !== ParticipationMode.EAT && !data.address) {
-    redirect("/aanmelden?error=address");
+    redirect(`/aanmelden?error=address${organizationId ? `&organization=${encodeURIComponent(organizationId)}` : ""}`);
   }
 
   const existingParticipant = await prisma.participant.findFirst({
-    where: { email: data.email, organizationId: null }
+    where: { email: data.email, organizationId }
   });
   const participant = existingParticipant
     ? await prisma.participant.update({
@@ -140,7 +148,7 @@ export async function registerParticipant(formData: FormData) {
     : await prisma.participant.create({
         data: {
           ...data,
-          organizationId: null,
+          organizationId,
           preferenceToken: createToken()
         }
       });
@@ -276,10 +284,11 @@ export async function setRoundParticipation(formData: FormData) {
 }
 
 export async function generateMonthlyRoundAction(formData: FormData) {
-  const key = requireAdmin(formData);
+  const admin = requireAdmin(formData);
+  const key = admin.key;
   const month = parseMonthInput(text(formData, "month"));
   try {
-    const result = await generateRoundForMonth(month);
+    const result = await generateRoundForMonth(month, admin.organizationId);
     redirectAdmin(key, `${result.matched} matches gemaakt voor ${result.requested} eetverzoeken.`, { step: "planning" });
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
@@ -293,7 +302,8 @@ export async function generateMonthlyRoundAction(formData: FormData) {
 }
 
 export async function generatePlanningAction(formData: FormData) {
-  const key = requireAdmin(formData);
+  const admin = requireAdmin(formData);
+  const key = admin.key;
   const startMonth = parseMonthInput(text(formData, "startMonth"));
   const horizonMonths = normalizeHorizon(formData.get("horizonMonths"));
   const settings = {
@@ -306,10 +316,14 @@ export async function generatePlanningAction(formData: FormData) {
   };
 
   try {
+    const settingsId = admin.organizationId
+      ? `organization:${admin.organizationId}`
+      : "default";
     await prisma.planningSettings.upsert({
-      where: { id: "default" },
+      where: { id: settingsId },
       create: {
-        id: "default",
+        id: settingsId,
+        organizationId: admin.organizationId,
         ...settings
       },
       update: settings
@@ -319,6 +333,7 @@ export async function generatePlanningAction(formData: FormData) {
     const cleanup = await prisma.matchRound.deleteMany({
       where: {
         status: RoundStatus.DRAFT,
+        organizationId: admin.organizationId,
         month: {
           gte: startMonth,
           notIn: plannedMonths
@@ -331,7 +346,10 @@ export async function generatePlanningAction(formData: FormData) {
     let skipped = 0;
     for (const plannedMonth of plannedMonths) {
       try {
-        const result = await generateRoundForMonth(plannedMonth);
+        const result = await generateRoundForMonth(
+          plannedMonth,
+          admin.organizationId
+        );
         matched += result.matched;
         requested += result.requested;
       } catch (error) {
@@ -362,10 +380,11 @@ export async function generatePlanningAction(formData: FormData) {
 }
 
 export async function sendHostInvitesAction(formData: FormData) {
-  const key = requireAdmin(formData);
+  const admin = requireAdmin(formData);
+  const key = admin.key;
   const roundId = text(formData, "roundId") || undefined;
   try {
-    const sent = await sendHostInvitesForRound(roundId);
+    const sent = await sendHostInvitesForRound(roundId, admin.organizationId);
     redirectAdmin(
       key,
       sent > 0
@@ -383,13 +402,22 @@ export async function sendHostInvitesAction(formData: FormData) {
 }
 
 export async function reopenRoundAction(formData: FormData) {
-  const key = requireAdmin(formData);
+  const admin = requireAdmin(formData);
+  const key = admin.key;
   const roundId = text(formData, "roundId");
 
   try {
+    const ownedRound = await prisma.matchRound.findFirst({
+      where: { id: roundId, organizationId: admin.organizationId },
+      select: { id: true }
+    });
+    if (!ownedRound) {
+      redirectAdmin(key, "Ronde niet gevonden.", { step: "planning" });
+    }
     const confirmed = await prisma.mealMatch.count({
       where: {
         roundId,
+        round: { organizationId: admin.organizationId },
         status: MatchStatus.EATER_CONFIRMED
       }
     });
@@ -425,8 +453,8 @@ export async function reopenRoundAction(formData: FormData) {
           fallbackSentAt: null
         }
       }),
-      prisma.matchRound.update({
-        where: { id: roundId },
+      prisma.matchRound.updateMany({
+        where: { id: roundId, organizationId: admin.organizationId },
         data: { status: RoundStatus.DRAFT }
       })
     ]);
@@ -444,10 +472,11 @@ export async function reopenRoundAction(formData: FormData) {
 }
 
 export async function sendPreferenceChecksAction(formData: FormData) {
-  const key = requireAdmin(formData);
+  const admin = requireAdmin(formData);
+  const key = admin.key;
   const month = parseMonthInput(text(formData, "month"));
   try {
-    const sent = await sendPreferenceChecksForMonth(month);
+    const sent = await sendPreferenceChecksForMonth(month, admin.organizationId);
     redirectAdmin(key, `${sent} meedoen-check(s) aangemaakt/verwerkt.`, { step: "mails" });
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
@@ -461,9 +490,10 @@ export async function sendPreferenceChecksAction(formData: FormData) {
 }
 
 export async function runJobsAction(formData: FormData) {
-  const key = requireAdmin(formData);
+  const admin = requireAdmin(formData);
+  const key = admin.key;
   try {
-    const result = await runDueJobs();
+    const result = await runDueJobs(new Date(), admin.organizationId);
     redirectAdmin(
       key,
       `Jobs klaar: ${result.preferenceChecks} voorkeurschecks en ${result.hostInvites} host-mails.`,
@@ -481,7 +511,8 @@ export async function runJobsAction(formData: FormData) {
 }
 
 export async function saveMailTemplateAction(formData: FormData) {
-  const key = requireAdmin(formData);
+  const admin = requireAdmin(formData);
+  const key = admin.key;
   const type = text(formData, "type");
   const subject = text(formData, "subject");
   const body = text(formData, "body");
@@ -498,7 +529,7 @@ export async function saveMailTemplateAction(formData: FormData) {
 
   try {
     const existingTemplate = await prisma.mailTemplate.findFirst({
-      where: { type, organizationId: null }
+      where: { type, organizationId: admin.organizationId }
     });
     if (existingTemplate) {
       await prisma.mailTemplate.update({
@@ -507,7 +538,13 @@ export async function saveMailTemplateAction(formData: FormData) {
       });
     } else {
       await prisma.mailTemplate.create({
-        data: { type, subject, body, enabled, organizationId: null }
+        data: {
+          type,
+          subject,
+          body,
+          enabled,
+          organizationId: admin.organizationId
+        }
       });
     }
     redirectAdmin(key, `${definition.label} ${enabled ? "staat aan en is opgeslagen" : "staat uit en is opgeslagen"}.`, {
@@ -525,13 +562,17 @@ export async function saveMailTemplateAction(formData: FormData) {
 }
 
 export async function saveAdminParticipantAction(formData: FormData) {
-  const key = requireAdmin(formData);
+  const admin = requireAdmin(formData);
+  const key = admin.key;
   const participantId = text(formData, "participantId");
 
   try {
     const existing = participantId
       ? await prisma.participant.findUnique({
-          where: { id: participantId },
+          where: {
+            id: participantId,
+            organizationId: admin.organizationId
+          },
           select: { eaterFrequency: true, hostFrequency: true }
         })
       : null;
@@ -556,6 +597,7 @@ export async function saveAdminParticipantAction(formData: FormData) {
     await prisma.participant.create({
       data: {
         ...data,
+        organizationId: admin.organizationId,
         active: true,
         allergies: null,
         address: null,
@@ -581,7 +623,11 @@ export async function saveAdminParticipantAction(formData: FormData) {
 }
 
 export async function seedDemoAction(formData: FormData) {
-  const key = requireAdmin(formData);
+  const admin = requireAdmin(formData);
+  const key = admin.key;
+  if (admin.organizationId) {
+    redirectAdmin(key, "Demo-data is alleen beschikbaar in de legacy-omgeving.");
+  }
   if (!demoSeedEnabled()) {
     redirectAdmin(key, "Demo-seed staat uit. Zet ALLOW_DEMO_SEED=true om te kunnen seeden.");
   }
@@ -599,7 +645,11 @@ export async function seedDemoAction(formData: FormData) {
 }
 
 export async function clearDemoAction(formData: FormData) {
-  const key = requireAdmin(formData);
+  const admin = requireAdmin(formData);
+  const key = admin.key;
+  if (admin.organizationId) {
+    redirectAdmin(key, "Demo-data is alleen beschikbaar in de legacy-omgeving.");
+  }
   if (!demoSeedEnabled()) {
     redirectAdmin(key, "Demo-seed staat uit. Zet ALLOW_DEMO_SEED=true om demo-data te kunnen wissen.");
   }
@@ -617,11 +667,15 @@ export async function clearDemoAction(formData: FormData) {
 }
 
 export async function cancelMatchAction(formData: FormData) {
-  const key = requireAdmin(formData);
+  const admin = requireAdmin(formData);
+  const key = admin.key;
   const matchId = text(formData, "matchId");
   try {
-    await prisma.mealMatch.update({
-      where: { id: matchId },
+    await prisma.mealMatch.updateMany({
+      where: {
+        id: matchId,
+        round: { organizationId: admin.organizationId }
+      },
       data: { status: MatchStatus.CANCELLED }
     });
     redirectAdmin(key, "Match geannuleerd.", { step: "planning" });

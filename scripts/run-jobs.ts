@@ -1,8 +1,8 @@
-import { runDueJobs } from "../lib/automation";
+import { runDueJobsForAllOrganizations } from "../lib/automation";
 import { prisma } from "../lib/db";
 
 async function main() {
-  const result = await runDueJobs();
+  const result = await runDueJobsForAllOrganizations();
   console.log(JSON.stringify(result, null, 2));
 }
 

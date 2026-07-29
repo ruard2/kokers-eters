@@ -236,7 +236,7 @@ export async function generateRoundForMonth(
   });
 
   const optOuts = await prisma.roundOptOut.findMany({
-    where: { month },
+    where: { month, participant: { organizationId } },
     select: { participantId: true }
   });
   const optedOut = new Set(optOuts.map((item) => item.participantId));
@@ -254,7 +254,7 @@ export async function generateRoundForMonth(
   const priorMatches = await prisma.mealMatch.findMany({
     where: {
       status: { notIn: [MatchStatus.CANCELLED, MatchStatus.DRAFT] },
-      round: { month: { lt: month } }
+      round: { month: { lt: month }, organizationId }
     },
     select: {
       hostId: true,

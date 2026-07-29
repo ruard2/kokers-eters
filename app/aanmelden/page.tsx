@@ -13,9 +13,10 @@ function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-async function getSignupBalance() {
+async function getSignupBalance(organizationId: string | null) {
   try {
     const participants = await prisma.participant.findMany({
+      where: { organizationId },
       select: {
         active: true,
         mode: true,
@@ -35,12 +36,19 @@ async function getSignupBalance() {
 export default async function SignupPage({ searchParams }: PageProps) {
   const params = (await searchParams) || {};
   const error = first(params.error);
-  const balance = await getSignupBalance();
+  const requestedOrganizationId = first(params.organization) || "";
+  const organization = requestedOrganizationId
+    ? await prisma.organization.findUnique({
+        where: { id: requestedOrganizationId },
+        select: { id: true, name: true }
+      })
+    : null;
+  const balance = await getSignupBalance(organization?.id || null);
 
   return (
     <div className="page">
       <section className="intro">
-        <p className="eyebrow">Kerkgemeenschap</p>
+        <p className="eyebrow">{organization?.name || "Kerkgemeenschap"}</p>
         <h1>Schuif aan of zet je tafel open.</h1>
         <p>
           Vul kort in hoe je wilt meedoen. De app koppelt mensen per ronde automatisch en stuurt daarna de juiste mails.
@@ -56,6 +64,11 @@ export default async function SignupPage({ searchParams }: PageProps) {
       ) : null}
 
       <form action={registerParticipant} className="panel form-grid">
+        <input
+          name="organizationId"
+          type="hidden"
+          value={organization?.id || ""}
+        />
         <ParticipantFormFields balance={balance} />
         <div className="actions wide">
           <button type="submit">Aanmelden</button>
