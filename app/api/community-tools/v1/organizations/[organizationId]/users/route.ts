@@ -20,6 +20,10 @@ export async function GET(
     include: {
       accounts: {
         orderBy: [{ name: "asc" }, { email: "asc" }]
+      },
+      participants: {
+        select: { id: true, name: true, email: true, mode: true, active: true },
+        orderBy: [{ name: "asc" }, { email: "asc" }]
       }
     }
   });
@@ -34,13 +38,25 @@ export async function GET(
     version: "1",
     product: "shared_meals",
     organizationId,
-    users: organization.accounts.map((account) => ({
+    users: [
+      ...organization.accounts.map((account) => ({
       id: `admin:${account.id}`,
       communityToolsUserId: account.communityToolsUserId,
       name: account.name || account.email,
       email: account.email,
       role: account.role === "owner" ? "organization_owner" : "organization_admin",
-      status: "active"
-    }))
+      status: "active",
+      kind: "admin"
+      })),
+      ...organization.participants.map((participant) => ({
+        id: `participant:${participant.id}`,
+        communityToolsUserId: null,
+        name: participant.name,
+        email: participant.email,
+        role: participant.mode === "HOST" ? "cook" : participant.mode === "EAT" ? "eater" : "cook_and_eater",
+        status: participant.active ? "active" : "inactive",
+        kind: "user"
+      }))
+    ]
   });
 }

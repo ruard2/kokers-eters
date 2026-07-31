@@ -12,8 +12,9 @@ deelnemers, rondes, matches, instellingen en mailtemplates.
 
 De optionele read-only beheer-API gebruikt daarnaast
 `COMMUNITY_TOOLS_MANAGEMENT_ENABLED` en een afzonderlijk
-`COMMUNITY_TOOLS_MANAGEMENT_SECRET`. Deze API toont alleen gekoppelde
-beheeraccounts; deelnemers, adressen, voorkeuren, rondes en matches blijven
+`COMMUNITY_TOOLS_MANAGEMENT_SECRET`. Deze API onderscheidt gekoppelde
+beheeraccounts van kokers en eters. Alleen naam, e-mail, rol en actiefstatus
+zijn centraal beheerbaar; adressen, voorkeuren, rondes en matches blijven
 uitsluitend binnen Kokers & eters.
 
 Benodigde variabelen:

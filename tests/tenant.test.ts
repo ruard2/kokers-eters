@@ -88,7 +88,7 @@ test("management directory is independently opt-in and bearer protected", () => 
   );
 });
 
-test("management directory exposes accounts but not meal participants", async () => {
+test("management directory separates accounts and safe participant fields", async () => {
   const route = await readFile(
     new URL(
       "app/api/community-tools/v1/organizations/[organizationId]/users/route.ts",
@@ -97,6 +97,8 @@ test("management directory exposes accounts but not meal participants", async ()
     "utf8"
   );
   assert.match(route, /include: \{\s*accounts:/);
-  assert.doesNotMatch(route, /participant\.findMany|participants:/);
+  assert.match(route, /participants:/);
+  assert.match(route, /kind: "user"/);
+  assert.doesNotMatch(route, /allergies: true|address: true|whatsapp: true|adminNoMatch: true/);
   assert.match(route, /communityToolsId: organizationId/);
 });
