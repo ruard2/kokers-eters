@@ -10,6 +10,12 @@ Na activering wisselt `/api/community-tools/sso` een eenmalig ticket
 server-to-server om. Iedere centrale organisatie krijgt volledig gescheiden
 deelnemers, rondes, matches, instellingen en mailtemplates.
 
+De optionele read-only beheer-API gebruikt daarnaast
+`COMMUNITY_TOOLS_MANAGEMENT_ENABLED` en een afzonderlijk
+`COMMUNITY_TOOLS_MANAGEMENT_SECRET`. Deze API toont alleen gekoppelde
+beheeraccounts; deelnemers, adressen, voorkeuren, rondes en matches blijven
+uitsluitend binnen Kokers & eters.
+
 Benodigde variabelen:
 
 ```env

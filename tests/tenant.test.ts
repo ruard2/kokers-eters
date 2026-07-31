@@ -5,6 +5,7 @@ import {
   createCommunityToolsAdminKey,
   resolveAdminContext
 } from "../lib/admin";
+import { verifyCommunityToolsManagementRequest } from "../lib/community-tools-management";
 
 const root = new URL("../", import.meta.url);
 
@@ -64,4 +65,38 @@ test("Community Tools callback only accepts the shared meals product", async () 
   assert.match(callback, /createCommunityToolsAdminKey/);
   assert.match(callback, /appUrl\(`\/\?key=/);
   assert.doesNotMatch(callback, /new URL\([^)]*request\.url/);
+});
+
+test("management directory is independently opt-in and bearer protected", () => {
+  process.env.COMMUNITY_TOOLS_MANAGEMENT_ENABLED = "true";
+  process.env.COMMUNITY_TOOLS_MANAGEMENT_SECRET = "management-secret";
+  assert.equal(
+    verifyCommunityToolsManagementRequest(
+      new Request("https://example.test", {
+        headers: { authorization: "Bearer management-secret" }
+      })
+    ),
+    true
+  );
+  assert.equal(
+    verifyCommunityToolsManagementRequest(
+      new Request("https://example.test", {
+        headers: { authorization: "Bearer wrong" }
+      })
+    ),
+    false
+  );
+});
+
+test("management directory exposes accounts but not meal participants", async () => {
+  const route = await readFile(
+    new URL(
+      "app/api/community-tools/v1/organizations/[organizationId]/users/route.ts",
+      root
+    ),
+    "utf8"
+  );
+  assert.match(route, /include: \{\s*accounts:/);
+  assert.doesNotMatch(route, /participant\.findMany|participants:/);
+  assert.match(route, /communityToolsId: organizationId/);
 });
