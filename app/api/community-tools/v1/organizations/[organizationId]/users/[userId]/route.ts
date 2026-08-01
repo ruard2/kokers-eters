@@ -15,7 +15,7 @@ export async function PATCH(
   const { organizationId, userId } = await params;
   const organization = await organizationFor(request, organizationId);
   if (!organization) return Response.json({ error: "Geen toegang of organisatie niet gevonden." }, { status: 404 });
-  const body = await request.json() as { name?: string; email?: string; status?: string };
+  const body = await request.json() as { name?: string; email?: string; status?: string; role?: string };
   const name = body.name?.trim();
   const email = body.email?.trim().toLowerCase();
   if (!name || !email) return Response.json({ error: "Naam en e-mail zijn verplicht." }, { status: 400 });
@@ -24,7 +24,8 @@ export async function PATCH(
     if (kind === "participant") {
       const found = await prisma.participant.findFirst({ where: { id, organizationId: organization.id } });
       if (!found) return Response.json({ error: "Niet gevonden." }, { status: 404 });
-      await prisma.participant.update({ where: { id }, data: { name, email, active: body.status === "active" } });
+      const mode = body.role === "cook" ? "HOST" : body.role === "eater" ? "EAT" : body.role === "cook_and_eater" ? "BOTH" : found.mode;
+      await prisma.participant.update({ where: { id }, data: { name, email, active: body.status === "active", mode } });
     } else if (kind === "admin") {
       const found = await prisma.communityToolsAccount.findFirst({ where: { id, organizationId: organization.id } });
       if (!found) return Response.json({ error: "Niet gevonden." }, { status: 404 });
