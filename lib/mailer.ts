@@ -1,5 +1,4 @@
 import type { MealMatch, MatchRound, Participant } from "@prisma/client";
-import { Resend } from "resend";
 import { displayDate, displayMonth, jsonDateList, monthInputValue } from "./dates";
 import { prisma } from "./db";
 import { renderMailTemplate } from "./mail-templates";
@@ -63,8 +62,7 @@ export async function sendEmail(input: EmailInput) {
     }
   }
 
-  const from = process.env.EMAIL_FROM || "Eters & Kokers <noreply@example.nl>";
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.BREVO_API_KEY;
 
   if (!apiKey) {
     await prisma.emailLog.create({
@@ -82,15 +80,32 @@ export async function sendEmail(input: EmailInput) {
     return { status: "skipped_no_provider" };
   }
 
-  const resend = new Resend(apiKey);
-  const result = await resend.emails.send({
-    from,
-    to: input.to,
-    subject: input.subject,
-    html: input.html
+  // Parse EMAIL_FROM into Brevo's sender object.
+  // Accepts "Naam <adres@domein.nl>" or plain "adres@domein.nl".
+  const fromRaw = process.env.EMAIL_FROM || "Eters & Kokers <noreply@example.nl>";
+  const fromMatch = fromRaw.match(/^(.*?)\s*<(.+?)>$/);
+  const sender = fromMatch
+    ? { name: fromMatch[1].trim(), email: fromMatch[2].trim() }
+    : { email: fromRaw.trim() };
+
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": apiKey,
+      "content-type": "application/json",
+      accept: "application/json"
+    },
+    body: JSON.stringify({
+      sender,
+      to: [{ email: input.to }],
+      subject: input.subject,
+      htmlContent: input.html
+    })
   });
 
-  if (result.error) {
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({})) as { message?: string };
+    const errorMessage = err.message || `Brevo HTTP ${response.status}`;
     await prisma.emailLog.create({
       data: {
         participantId: input.participantId,
@@ -100,11 +115,13 @@ export async function sendEmail(input: EmailInput) {
         toEmail: input.to,
         subject: input.subject,
         status: "ERROR",
-        error: result.error.message
+        error: errorMessage
       }
     });
-    throw new Error(result.error.message);
+    throw new Error(errorMessage);
   }
+
+  const data = await response.json() as { messageId?: string };
 
   await prisma.emailLog.create({
     data: {
@@ -115,7 +132,7 @@ export async function sendEmail(input: EmailInput) {
       toEmail: input.to,
       subject: input.subject,
       status: "SENT",
-      providerId: result.data?.id
+      providerId: data.messageId
     }
   });
 
