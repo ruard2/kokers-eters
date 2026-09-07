@@ -80,13 +80,12 @@ export async function sendEmail(input: EmailInput) {
     return { status: "skipped_no_provider" };
   }
 
-  // Parse EMAIL_FROM into Brevo's sender object.
-  // Accepts "Naam <adres@domein.nl>" or plain "adres@domein.nl".
-  const fromRaw = process.env.EMAIL_FROM || "Eters & Kokers <noreply@example.nl>";
-  const fromMatch = fromRaw.match(/^(.*?)\s*<(.+?)>$/);
-  const sender = fromMatch
-    ? { name: fromMatch[1].trim(), email: fromMatch[2].trim() }
-    : { email: fromRaw.trim() };
+  // Sender: same env var names as CommunityTools so the Railway secret can be shared.
+  // BREVO_SENDER_EMAIL is the authenticated address (no-reply@communitytools.online).
+  // MAILER_SENDER_NAME lets this app present itself as "Eters & Kokers" to recipients.
+  const senderEmail = process.env.BREVO_SENDER_EMAIL ?? "no-reply@communitytools.online";
+  const senderName = process.env.MAILER_SENDER_NAME ?? "Eters & Kokers";
+  const sender = { name: senderName, email: senderEmail };
 
   const response = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
