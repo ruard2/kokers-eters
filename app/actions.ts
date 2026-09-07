@@ -2,6 +2,7 @@
 
 import { CommunityScope, Frequency, GatheringType, MatchStatus, ParticipationMode, Prisma, RoundStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { demoSeedEnabled, resolveAdminContext } from "@/lib/admin";
 import { runDueJobs, sendHostInvitesForRound, sendPreferenceChecksForMonth } from "@/lib/automation";
 import { addMonths, dateInputToDate, jsonDateList, monthInputValue, parseMonthInput } from "@/lib/dates";
@@ -394,6 +395,7 @@ export async function sendHostInvitesAction(formData: FormData) {
       { step: "mails" }
     );
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     if (databaseUnavailableNotice(error)) {
       redirectAdmin(key, "Database niet bereikbaar. Host-mails kunnen pas met een echte database.", { step: "planning" });
     }
@@ -481,6 +483,7 @@ export async function sendPreferenceChecksAction(formData: FormData) {
     const sent = await sendPreferenceChecksForMonth(month, admin.organizationId);
     redirectAdmin(key, `${sent} meedoen-check(s) aangemaakt/verwerkt.`, { step: "mails" });
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     if (databaseUnavailableNotice(error)) {
       redirectAdmin(key, "Database niet bereikbaar. Voorkeursmails kunnen pas met een echte database.", {
         step: "mails"
