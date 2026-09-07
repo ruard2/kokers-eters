@@ -398,7 +398,8 @@ export async function sendHostInvitesAction(formData: FormData) {
       redirectAdmin(key, "Database niet bereikbaar. Host-mails kunnen pas met een echte database.", { step: "planning" });
     }
 
-    throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    redirectAdmin(key, `Fout bij versturen: ${message}`, { step: "mails" });
   }
 }
 
@@ -486,7 +487,8 @@ export async function sendPreferenceChecksAction(formData: FormData) {
       });
     }
 
-    throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    redirectAdmin(key, `Fout bij versturen: ${message}`, { step: "mails" });
   }
 }
 

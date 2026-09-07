@@ -21,7 +21,13 @@ export async function sendPreferenceChecksForMonth(
 
   let sent = 0;
   for (const participant of participants) {
-    const result = await sendPreferenceCheck(participant, month);
+    let result: { status: string };
+    try {
+      result = await sendPreferenceCheck(participant, month);
+    } catch (error) {
+      console.error(`[mail error] preference check for participant ${participant.id}:`, error);
+      continue;
+    }
     if (result.status !== "skipped_disabled") {
       sent += 1;
     }
@@ -46,7 +52,15 @@ export async function sendHostInvitesForRound(
 
   let sent = 0;
   for (const match of matches) {
-    const result = await sendHostInvite(match);
+    let result: { status: string };
+    try {
+      result = await sendHostInvite(match);
+    } catch (error) {
+      // Mail provider error: log and skip this match so the rest still go out.
+      console.error(`[mail error] host invite for match ${match.id}:`, error);
+      continue;
+    }
+
     if (result.status !== "sent" && result.status !== "skipped_existing") {
       continue;
     }
