@@ -657,52 +657,6 @@ function EmailLogsTable({ emailLogs }: { emailLogs: EmailLog[] }) {
   );
 }
 
-function RoundMailActions({
-  adminKey,
-  matches,
-  rounds,
-  usingDemoData
-}: {
-  adminKey: string;
-  matches: MatchWithPeople[];
-  rounds: RoundWithMatches[];
-  usingDemoData: boolean;
-}) {
-  const draftCounts = new Map<string, number>();
-  for (const match of matches) {
-    if (match.status === "DRAFT") {
-      draftCounts.set(match.roundId, (draftCounts.get(match.roundId) || 0) + 1);
-    }
-  }
-
-  const orderedRounds = [...rounds].sort((a, b) => a.month.getTime() - b.month.getTime());
-
-  return (
-    <div className="mail-round-list">
-      {orderedRounds.map((round) => {
-        const draftCount = draftCounts.get(round.id) || 0;
-        return (
-          <div className="mail-round-row" key={round.id}>
-            <div>
-              <strong>{displayMonth(round.month)}</strong>
-              <small>
-                {statusLabel(round.status)} - {draftCount} conceptmatch(es) klaar voor host-mail
-              </small>
-            </div>
-            <form action={sendHostInvitesAction}>
-              <input type="hidden" name="adminKey" value={adminKey} />
-              <input type="hidden" name="roundId" value={round.id} />
-              <button className="small" disabled={usingDemoData || draftCount === 0} type="submit">
-                Host-mails sturen
-              </button>
-            </form>
-          </div>
-        );
-      })}
-      {orderedRounds.length === 0 ? <div className="board-empty">Nog geen rondes om te mailen.</div> : null}
-    </div>
-  );
-}
 
 function StepOne({
   adminKey,
@@ -833,19 +787,13 @@ function StepTwo({
 
 function StepFour({
   adminKey,
-  defaultMonth,
   emailLogs,
-  matches,
   mailTemplates,
-  rounds,
   usingDemoData
 }: {
   adminKey: string;
-  defaultMonth: string;
   emailLogs: EmailLog[];
-  matches: MatchWithPeople[];
   mailTemplates: MailTemplate[];
-  rounds: RoundWithMatches[];
   usingDemoData: boolean;
 }) {
   const savedTemplates = new Map(mailTemplates.map((template) => [template.type, template]));
@@ -853,28 +801,11 @@ function StepFour({
   return (
     <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 3" title="Mails klaarzetten">
       <div className="mail-cycle-note">
-        <strong>Links staan automatisch klaar.</strong>
+        <strong>Hier stel je in welke mails het systeem verstuurt en wat erin staat.</strong>
         <span>
-          Per match vult het systeem de juiste persoonlijke URL in, zoals hostUrl, eaterUrl, participateUrl en
-          preferencesUrl. Zet een mail uit als je die stap niet wilt gebruiken.
+          Per match vult het systeem de juiste persoonlijke URL in. Zet een mail uit als je die stap niet wilt gebruiken.
+          Versturen doe je in stap 4.
         </span>
-      </div>
-      <form action={sendPreferenceChecksAction} className="inline-form">
-        <input type="hidden" name="adminKey" value={adminKey} />
-        <label>
-          Meedoen-check voor maand
-          <input name="month" type="month" defaultValue={defaultMonth} />
-        </label>
-        <button className="secondary" disabled={usingDemoData} type="submit">
-          Meedoen-check nu sturen
-        </button>
-      </form>
-      <div className="nested-panel">
-        <div className="section-header">
-          <h2>Host-mails per ronde</h2>
-          <span className="section-hint">Stuur pas als de matches in stap 2 goed staan.</span>
-        </div>
-        <RoundMailActions adminKey={adminKey} matches={matches} rounds={rounds} usingDemoData={usingDemoData} />
       </div>
       <div className="mail-template-list">
         {adminMailTemplateDefinitions.map((definition) => {
@@ -925,22 +856,20 @@ function StepFour({
 
 function StepFive({
   adminKey,
-  draftReviewMatches,
+  defaultMonth,
   emailLogs,
   matches,
   participants,
   planningSettings,
-  reviewRound,
   rounds,
   usingDemoData
 }: {
   adminKey: string;
-  draftReviewMatches: MatchWithPeople[];
+  defaultMonth: string;
   emailLogs: EmailLog[];
   matches: MatchWithPeople[];
   participants: Participant[];
   planningSettings: PlanningSettingsView;
-  reviewRound: RoundWithMatches | undefined;
   rounds: RoundWithMatches[];
   usingDemoData: boolean;
 }) {
@@ -950,6 +879,7 @@ function StepFive({
   const guestCount = activeParticipants.filter((participant) => participant.isGuest).length;
   const memberCount = activeParticipants.length - guestCount;
   const savedPlanningLabel = planningHorizonLabel(planningSettings.horizonMonths);
+  const totalDraftMatches = matches.filter((match) => match.status === "DRAFT").length;
 
   return (
     <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 4" title="Samenvatting en afronden">
@@ -965,7 +895,7 @@ function StepFive({
           <span>Stap 2</span>
           <strong>{rounds.length} ronde(s)</strong>
           <small>
-            Planning staat op {savedPlanningLabel}; {draftReviewMatches.length} conceptmatch(es) wachten op goedkeuring.
+            Planning staat op {savedPlanningLabel}; {totalDraftMatches} conceptmatch(es) wachten op goedkeuring.
           </small>
         </div>
         <div>
@@ -976,27 +906,51 @@ function StepFive({
         <div>
           <span>Stap 4</span>
           <strong>{matches.length} matches totaal</strong>
-          <small>Controleer de planning en rond af met host-mails.</small>
+          <small>
+            {totalDraftMatches > 0
+              ? `${totalDraftMatches} conceptmatch(es) wachten op goedkeuring.`
+              : "Alle matches zijn al goedgekeurd of verstuurd."}
+          </small>
         </div>
+      </div>
+
+      <div className="approval-panel">
+        <div>
+          <strong>Meedoen-check versturen</strong>
+          <p>
+            Vraag deelnemers of ze meewillen in de komende maand. Optioneel — sla over als je dit handmatig of via de
+            automatische cron afhandelt.
+          </p>
+        </div>
+        <form action={sendPreferenceChecksAction} className="inline-form">
+          <input type="hidden" name="adminKey" value={adminKey} />
+          <label>
+            Maand
+            <input name="month" type="month" defaultValue={defaultMonth} />
+          </label>
+          <button className="secondary" disabled={usingDemoData} type="submit">
+            Stuur meedoen-checks
+          </button>
+        </form>
       </div>
 
       <div className="approval-panel">
         <div>
           <strong>Akkoord met deze planning?</strong>
           <p>
-            Na goedkeuring krijgen de kokers hun mail. Als deelnemers tussentijds wijzigen, pas je de sheet aan en loop je
-            stap 2 opnieuw langs.
+            Na goedkeuring krijgen alle kokers van concept-rondes hun mail. Als deelnemers tussentijds wijzigen, pas je
+            de sheet aan en loop je stap 2 opnieuw langs.
           </p>
         </div>
-        {reviewRound ? (
-          <form action={sendHostInvitesAction}>
-            <input type="hidden" name="adminKey" value={adminKey} />
-            <input type="hidden" name="roundId" value={reviewRound.id} />
-            <button disabled={usingDemoData || draftReviewMatches.length === 0} type="submit">
-              Host-mails sturen
-            </button>
-          </form>
-        ) : null}
+        <form action={sendHostInvitesAction}>
+          <input type="hidden" name="adminKey" value={adminKey} />
+          {/* Geen roundId = verstuurt naar alle concept-rondes in één keer */}
+          <button disabled={usingDemoData || totalDraftMatches === 0} type="submit">
+            {totalDraftMatches > 0
+              ? `Geef akkoord — stuur ${totalDraftMatches} host-mail${totalDraftMatches !== 1 ? "s" : ""}`
+              : "Geen concept-matches om te versturen"}
+          </button>
+        </form>
       </div>
 
       <div className="nested-panel">
@@ -1169,15 +1123,6 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const planningStart = parseMonthInput(defaultMonth);
   const planningEnd = addMonths(planningStart, planningSettings.horizonMonths);
   const planningRounds = rounds.filter((round) => round.month >= planningStart && round.month < planningEnd);
-  const reviewRound =
-    rounds.find((round) => matches.some((match) => match.roundId === round.id && match.status === "DRAFT")) ||
-    rounds.find((round) => matches.some((match) => match.roundId === round.id));
-  const reviewMatches = reviewRound
-    ? matches
-        .filter((match) => match.roundId === reviewRound.id && match.status !== "CANCELLED")
-        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-    : [];
-  const draftReviewMatches = reviewMatches.filter((match) => match.status === "DRAFT");
 
   return (
     <div className="page wide-page">
@@ -1225,23 +1170,19 @@ export default async function AdminPage({ searchParams }: PageProps) {
       {currentStep === "mails" ? (
         <StepFour
           adminKey={key}
-          defaultMonth={defaultMonth}
           emailLogs={emailLogs}
-          matches={matches}
           mailTemplates={mailTemplates}
-          rounds={rounds}
           usingDemoData={usingDemoData}
         />
       ) : null}
       {currentStep === "summary" ? (
         <StepFive
           adminKey={key}
-          draftReviewMatches={draftReviewMatches}
+          defaultMonth={defaultMonth}
           emailLogs={emailLogs}
           matches={matches}
           participants={participants}
           planningSettings={planningSettings}
-          reviewRound={reviewRound}
           rounds={rounds}
           usingDemoData={usingDemoData}
         />
