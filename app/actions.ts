@@ -59,6 +59,7 @@ function participantFormData(formData: FormData, active: boolean) {
     address: host ? optionalText(formData, "address") : null,
     cannotEatDays: eat ? optionalText(formData, "cannotEatDays") : null,
     cannotHostDays: host ? optionalText(formData, "cannotHostDays") : null,
+    isGuest: formData.get("isGuest") === "on",
     communityScope: CommunityScope.COMMUNITY_WIDE,
     gatheringType: gatheringType(formData),
     cookingPlan: null,
@@ -682,6 +683,39 @@ export async function cancelMatchAction(formData: FormData) {
   } catch (error) {
     if (databaseUnavailableNotice(error)) {
       redirectAdmin(key, "Database niet bereikbaar. Demo-matches kun je niet wijzigen.", { step: "planning" });
+    }
+
+    throw error;
+  }
+}
+
+export async function deleteParticipantAction(formData: FormData) {
+  const admin = requireAdmin(formData);
+  const key = admin.key;
+  const participantId = text(formData, "participantId");
+
+  try {
+    const existing = await prisma.participant.findUnique({
+      where: { id: participantId, organizationId: admin.organizationId },
+      select: { id: true, name: true }
+    });
+
+    if (!existing) {
+      redirectAdmin(key, "Deelnemer niet gevonden.", { step: "participants", sheet: "1" });
+    }
+
+    // Cascade deletes matches, optOuts via schema; emailLogs get SetNull
+    await prisma.participant.delete({
+      where: { id: participantId }
+    });
+
+    redirectAdmin(key, `${existing.name} verwijderd.`, { step: "participants", sheet: "1" });
+  } catch (error) {
+    if (databaseUnavailableNotice(error)) {
+      redirectAdmin(key, "Database niet bereikbaar. Deelnemers verwijderen kan pas met een echte database.", {
+        step: "participants",
+        sheet: "1"
+      });
     }
 
     throw error;

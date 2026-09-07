@@ -3,7 +3,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Eters & Kokers",
-  description: "Een simpele maaltijd-randomizer voor de kerkgemeenschap."
+  description: "Een simpele maaltijd-randomizer voor de kerkgemeenschap.",
+  icons: {
+    icon: "/favicon.svg"
+  }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

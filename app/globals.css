@@ -196,6 +196,29 @@ p {
   text-align: center;
 }
 
+.guest-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.guest-tooltip {
+  background: var(--warning);
+  border: 1px solid #dfc26f;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  max-width: 420px;
+  padding: 12px 14px;
+}
+
+.guest-tooltip p {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
 .form-grid {
   display: grid;
   gap: 20px;
@@ -1075,8 +1098,8 @@ th {
   align-items: center;
   display: grid;
   gap: 6px;
-  grid-template-columns: 56px minmax(150px, 1.2fr) minmax(190px, 1.4fr) minmax(120px, 0.9fr) 88px 104px 72px 84px minmax(150px, 1fr) 62px 86px;
-  min-width: 1280px;
+  grid-template-columns: 56px minmax(150px, 1.2fr) minmax(190px, 1.4fr) minmax(120px, 0.9fr) 88px 104px 72px 84px minmax(150px, 1fr) 62px 86px 44px;
+  min-width: 1320px;
 }
 
 .participant-sheet-head {

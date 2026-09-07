@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   cancelMatchAction,
   clearDemoAction,
+  deleteParticipantAction,
   generatePlanningAction,
   reopenRoundAction,
   seedDemoAction,
@@ -248,7 +249,8 @@ function ParticipantSheet({
         <span>Ontvangt</span>
         <span>Niet met</span>
         <span>Actief</span>
-        <span>Actie</span>
+        <span>Bewaar</span>
+        <span>Verwijder</span>
       </div>
 
       <form action={saveAdminParticipantAction} className="participant-sheet-row new-row">
@@ -289,6 +291,7 @@ function ParticipantSheet({
         <button className="small" disabled={usingDemoData} type="submit">
           Voeg toe
         </button>
+        <span />
       </form>
 
       {participants.map((participant, index) => (
@@ -346,6 +349,15 @@ function ParticipantSheet({
           </label>
           <button className="small secondary" disabled={usingDemoData} type="submit">
             Bewaar
+          </button>
+          <button
+            className="small danger"
+            disabled={usingDemoData}
+            formAction={deleteParticipantAction}
+            title={`${participant.name} permanent verwijderen (inclusief alle bijbehorende matches)`}
+            type="submit"
+          >
+            ✕
           </button>
         </form>
       ))}
