@@ -27,6 +27,34 @@ export default async function EaterPage({ params, searchParams }: PageProps) {
   }
 
   const dates = jsonDateList(match.proposedDates);
+  const justConfirmed = flag(query.confirmed);
+  const dateChosen = !!match.chosenDate;
+
+  // Done state: eater just confirmed, or date already set (e.g. on refresh)
+  if (justConfirmed || dateChosen) {
+    return (
+      <div className="page narrow">
+        <section className="panel">
+          <p className="eyebrow">Eter</p>
+          <h1>Bevestigd!</h1>
+          <p>
+            Voor {displayMonth(match.round.month)} ben je gekoppeld aan <strong>{match.host.name}</strong>.
+          </p>
+          <div className="notice success">
+            Definitieve datum: {displayDate(match.chosenDate ?? dates[0])}.
+          </div>
+          {justConfirmed && (
+            <div className="notice success" style={{ marginTop: "0.5rem" }}>
+              Jullie krijgen allebei een bevestigingsmail.
+            </div>
+          )}
+          <p style={{ marginTop: "1.5rem", color: "var(--color-muted, #5e6b62)" }}>
+            Je kunt dit venster sluiten.
+          </p>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="page narrow">
@@ -37,7 +65,6 @@ export default async function EaterPage({ params, searchParams }: PageProps) {
           Voor {displayMonth(match.round.month)} ben je gekoppeld aan <strong>{match.host.name}</strong>.
         </p>
 
-        {flag(query.confirmed) ? <div className="notice success">Bevestigd. Jullie krijgen allebei een mail.</div> : null}
         {query.error === "date" ? <div className="notice error">Kies een van de voorgestelde dagen.</div> : null}
 
         <div className="summary-grid">
@@ -51,9 +78,7 @@ export default async function EaterPage({ params, searchParams }: PageProps) {
           </div>
         </div>
 
-        {match.chosenDate ? (
-          <div className="notice success">Definitieve datum: {displayDate(match.chosenDate)}</div>
-        ) : dates.length > 0 ? (
+        {dates.length > 0 ? (
           <form action={submitEaterChoice} className="stack">
             <input type="hidden" name="token" value={token} />
             <div className="choice-list">
@@ -67,7 +92,7 @@ export default async function EaterPage({ params, searchParams }: PageProps) {
             <button type="submit">Deze dag bevestigen</button>
           </form>
         ) : (
-          <div className="notice">De host heeft nog geen dagen gekozen.</div>
+          <div className="notice">De host heeft nog geen dagen gekozen. Je ontvangt een mail zodra dat gedaan is.</div>
         )}
       </section>
     </div>

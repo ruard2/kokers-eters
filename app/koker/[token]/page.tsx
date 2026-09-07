@@ -27,6 +27,35 @@ export default async function HostPage({ params, searchParams }: PageProps) {
   }
 
   const dates = jsonDateList(match.proposedDates);
+  const justSent = flag(query.sent);
+  const dateChosen = !!match.chosenDate;
+
+  // Done state: host just sent dates, or eater already confirmed a date
+  if (justSent || dateChosen) {
+    return (
+      <div className="page narrow">
+        <section className="panel">
+          <p className="eyebrow">Koker</p>
+          <h1>{dateChosen ? "Afgesproken!" : "Verstuurd!"}</h1>
+          <p>
+            Voor {displayMonth(match.round.month)} ben je gekoppeld aan <strong>{match.eater.name}</strong>.
+          </p>
+          {dateChosen ? (
+            <div className="notice success">
+              Definitieve datum: {displayDate(match.chosenDate!)}.
+            </div>
+          ) : (
+            <div className="notice success">
+              De eter ontvangt een mail met jouw beschikbare dagen en kan nu een dag kiezen.
+            </div>
+          )}
+          <p style={{ marginTop: "1.5rem", color: "var(--color-muted, #5e6b62)" }}>
+            Je kunt dit venster sluiten.
+          </p>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="page narrow">
@@ -37,7 +66,6 @@ export default async function HostPage({ params, searchParams }: PageProps) {
           Voor {displayMonth(match.round.month)} ben je gekoppeld aan <strong>{match.eater.name}</strong>.
         </p>
 
-        {flag(query.sent) ? <div className="notice success">Verstuurd. De eter kan nu een definitieve dag kiezen.</div> : null}
         {query.error === "dates" ? <div className="notice error">Kies minimaal een dag.</div> : null}
 
         <div className="summary-grid">
@@ -50,10 +78,6 @@ export default async function HostPage({ params, searchParams }: PageProps) {
             <strong>{match.eater.allergies || "Geen bijzonderheden opgegeven"}</strong>
           </div>
         </div>
-
-        {match.chosenDate ? (
-          <div className="notice success">Definitieve datum: {displayDate(match.chosenDate)}</div>
-        ) : null}
 
         <form action={submitHostDates} className="stack">
           <input type="hidden" name="token" value={token} />
