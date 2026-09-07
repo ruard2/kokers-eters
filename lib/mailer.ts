@@ -49,11 +49,14 @@ function dateText(value: unknown) {
 
 export async function sendEmail(input: EmailInput) {
   if (input.contextKey) {
+    // Only block on a confirmed SENT — not on earlier skips or errors,
+    // so mails can be retried once a provider is configured.
     const existing = await prisma.emailLog.findFirst({
       where: {
         contextKey: input.contextKey,
         toEmail: input.to,
-        type: input.type
+        type: input.type,
+        status: "SENT"
       }
     });
 
@@ -65,12 +68,14 @@ export async function sendEmail(input: EmailInput) {
   const apiKey = process.env.BREVO_API_KEY;
 
   if (!apiKey) {
+    // Log the skip WITHOUT contextKey so a future attempt (once the provider
+    // is configured) is not blocked by this entry.
     await prisma.emailLog.create({
       data: {
         participantId: input.participantId,
         matchId: input.matchId,
         type: input.type,
-        contextKey: input.contextKey,
+        contextKey: null,
         toEmail: input.to,
         subject: input.subject,
         status: "SKIPPED_NO_PROVIDER"
