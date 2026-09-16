@@ -1036,13 +1036,22 @@ export default async function AdminPage({ searchParams }: PageProps) {
             </label>
             <button type="submit">Openen</button>
           </form>
+          <div style={{ marginTop: "1.5rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border, #e0e7e2)" }}>
+            <p style={{ margin: "0 0 0.75rem", color: "var(--color-muted, #5e6b62)", fontSize: "0.875rem" }}>
+              Wil je eerst zien hoe het werkt?
+            </p>
+            <a className="button secondary" href="/?key=demo">
+              Bekijk demo
+            </a>
+          </div>
         </section>
       </div>
     );
   }
   const organizationId = adminContext.organizationId;
+  const isDemoMode = adminContext.isDemoMode === true;
 
-  let usingDemoData = false;
+  let usingDemoData = isDemoMode;
   let participants: Participant[];
   let rounds: RoundWithMatches[];
   let matches: MatchWithPeople[];
@@ -1050,7 +1059,13 @@ export default async function AdminPage({ searchParams }: PageProps) {
   let planningSettings = defaultPlanningSettings;
   let mailTemplates: MailTemplate[] = [];
 
-  try {
+  if (isDemoMode) {
+    const demo = demoAdminData();
+    participants = demo.participants as unknown as Participant[];
+    rounds = demo.rounds as unknown as RoundWithMatches[];
+    matches = demo.matches as unknown as MatchWithPeople[];
+    emailLogs = demo.emailLogs as unknown as EmailLog[];
+  } else try {
     const [
       participantRows,
       roundRows,
@@ -1112,7 +1127,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
     rounds = demo.rounds as unknown as RoundWithMatches[];
     matches = demo.matches as unknown as MatchWithPeople[];
     emailLogs = demo.emailLogs as unknown as EmailLog[];
-  }
+  } // end else try
 
   const signupUrl = organizationId
     ? appUrl(`/aanmelden?organization=${encodeURIComponent(organizationId)}`)
@@ -1136,7 +1151,12 @@ export default async function AdminPage({ searchParams }: PageProps) {
       </section>
 
       {notice ? <div className="notice success">{notice}</div> : null}
-      {usingDemoData ? (
+      {isDemoMode ? (
+        <div className="notice">
+          <strong>Demo-modus.</strong> Je bekijkt een voorbeeld met nep-data. Alle knoppen zijn uitgeschakeld.{" "}
+          <a href="/">Terug naar inloggen</a>
+        </div>
+      ) : usingDemoData ? (
         <div className="notice">
           Demo-data zichtbaar omdat de lokale database niet bereikbaar is. Start Postgres en draai de seed om echte
           database-data te tonen.

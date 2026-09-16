@@ -12,12 +12,17 @@ export type AdminContext = {
   key: string;
   organizationId: string | null;
   communityToolsUserId: string | null;
+  isDemoMode?: boolean;
 };
 
 export function resolveAdminContext(
   value: string | undefined | null
 ): AdminContext | null {
   if (!value) return null;
+  // Special demo key — gives read-only access with fake data, no DB queries.
+  if (value === "demo") {
+    return { key: "demo", organizationId: null, communityToolsUserId: null, isDemoMode: true };
+  }
   if (value === adminToken()) {
     return { key: value, organizationId: null, communityToolsUserId: null };
   }

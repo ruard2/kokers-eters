@@ -82,6 +82,9 @@ function requireAdmin(formData: FormData) {
   if (!context) {
     throw new Error("Ongeldige admin-sleutel.");
   }
+  if (context.isDemoMode) {
+    throw new Error("Dit is de demo-modus. Acties zijn uitgeschakeld.");
+  }
 
   return context;
 }
