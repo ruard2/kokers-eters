@@ -1,7 +1,7 @@
 import { MatchStatus, RoundStatus } from "@prisma/client";
 import { addDays, addMonths, toMonthStart } from "./dates";
 import { prisma } from "./db";
-import { sendHostInvite, sendPreferenceCheck } from "./mailer";
+import { sendEaterIntro, sendHostInvite, sendPreferenceCheck } from "./mailer";
 import { generateRoundForMonth } from "./matching";
 
 const matchInclude = {
@@ -52,16 +52,31 @@ export async function sendHostInvitesForRound(
 
   let sent = 0;
   for (const match of matches) {
-    let result: { status: string };
+    // Try EATER_INTRO (simple flow: eater gets host info and contacts host themselves)
+    let eaterIntroResult: { status: string } = { status: "skipped_disabled" };
     try {
-      result = await sendHostInvite(match);
+      eaterIntroResult = await sendEaterIntro(match);
     } catch (error) {
-      // Mail provider error: log and skip this match so the rest still go out.
-      console.error(`[mail error] host invite for match ${match.id}:`, error);
-      continue;
+      console.error(`[mail error] eater intro for match ${match.id}:`, error);
     }
 
-    if (result.status !== "sent" && result.status !== "skipped_existing") {
+    // Try HOST_INVITE (complex flow: host picks dates via form) — only if configured
+    let hostInviteResult: { status: string } = { status: "skipped_disabled" };
+    try {
+      hostInviteResult = await sendHostInvite(match);
+    } catch (error) {
+      console.error(`[mail error] host invite for match ${match.id}:`, error);
+    }
+
+    const anySent =
+      eaterIntroResult.status === "sent" || eaterIntroResult.status === "skipped_existing" ||
+      hostInviteResult.status === "sent" || hostInviteResult.status === "skipped_existing";
+
+    // If both disabled (no templates on), still advance — match exists, just no mail.
+    const bothDisabled =
+      eaterIntroResult.status === "skipped_disabled" && hostInviteResult.status === "skipped_disabled";
+
+    if (!anySent && !bothDisabled) {
       continue;
     }
 

@@ -188,6 +188,33 @@ export async function sendPreferenceCheck(participant: Participant, month: Date)
   });
 }
 
+export async function sendEaterIntro(match: MatchWithPeople) {
+  const rendered = await renderMailTemplate("EATER_INTRO", {
+    eaterName: match.eater.name,
+    hostName: match.host.name,
+    hostEmail: match.host.email,
+    hostWhatsapp: match.host.whatsapp ?? "",
+    address: fallbackText(match.host.address, "Adres volgt via de koker."),
+    allergies: fallbackText(match.eater.allergies),
+    month: displayMonth(match.round.month),
+    partySize: match.partySize
+  }, match.eater.organizationId);
+
+  if (!rendered.enabled) {
+    return { status: "skipped_disabled" };
+  }
+
+  return sendEmail({
+    to: match.eater.email,
+    participantId: match.eaterId,
+    matchId: match.id,
+    type: "EATER_INTRO",
+    contextKey: `eater-intro:${match.id}`,
+    subject: rendered.subject,
+    html: layout(rendered.title, rendered.html)
+  });
+}
+
 export async function sendHostInvite(match: MatchWithPeople) {
   const hostUrl = appUrl(`/koker/${match.hostToken}`);
   const preferencesUrl = appUrl(`/voorkeuren/${match.host.preferenceToken}`);

@@ -3,6 +3,7 @@ import { prisma } from "./db";
 export type MailTemplateType =
   | "WELCOME"
   | "PREFERENCE_CHECK"
+  | "EATER_INTRO"
   | "HOST_INVITE"
   | "EATER_CHOICE"
   | "CONFIRMATION_HOST"
@@ -57,12 +58,39 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "Voorkeuren wijzigen:",
       "{{preferencesUrl}}"
     ].join("\n"),
-    adminVisible: true
+    adminVisible: true,
+    defaultEnabled: false
+  },
+  {
+    // Standaard-mail: eter krijgt direct de contactgegevens van de host en spreekt
+    // zelf een datum af. Simpelste flow — geen date-picking formulieren nodig.
+    type: "EATER_INTRO",
+    label: "Koppeling naar eter",
+    description: "Naar de eter na goedkeuring van de matches. Stuur dit als je wilt dat de eter zelf contact opneemt met de koker.",
+    title: "Je bent gekoppeld voor {{month}}",
+    subject: "Eters & Kokers: je bent gekoppeld voor {{month}}",
+    body: [
+      "Hoi {{eaterName}},",
+      "",
+      "Je bent voor {{month}} gekoppeld aan {{hostName}} ({{partySize}} persoon/personen).",
+      "",
+      "Neem via onderstaande contactgegevens zelf contact op om een datum af te spreken:",
+      "",
+      "{{hostName}}",
+      "{{hostEmail}}",
+      "{{hostWhatsapp}}",
+      "{{address}}",
+      "",
+      "Jouw allergieen of dieetwensen die zijn doorgegeven:",
+      "{{allergies}}"
+    ].join("\n"),
+    adminVisible: true,
+    defaultEnabled: true
   },
   {
     type: "HOST_INVITE",
-    label: "Host kiest dagen",
-    description: "Naar de koker/host na goedkeuring van de matches.",
+    label: "Host kiest dagen (formulier)",
+    description: "Naar de koker — stuurt hen naar een formulier om beschikbare dagen te kiezen. Zet aan als je het datum-kiesformulier wilt gebruiken in plaats van de simpele koppelingsmail.",
     title: "Je bent gekoppeld als host",
     subject: "Eters & Kokers: kun je dagen kiezen voor {{eaterName}}?",
     body: [
@@ -86,12 +114,13 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "Voorkeuren wijzigen:",
       "{{preferencesUrl}}"
     ].join("\n"),
-    adminVisible: true
+    adminVisible: true,
+    defaultEnabled: false
   },
   {
     type: "EATER_CHOICE",
-    label: "Eter kiest dag",
-    description: "Naar de eter nadat de host dagen heeft gekozen.",
+    label: "Eter kiest dag (formulier)",
+    description: "Naar de eter nadat de host dagen heeft gekozen via het formulier.",
     title: "Kies je definitieve dag",
     subject: "Eters & Kokers: kies een dag bij {{hostName}}",
     body: [
@@ -116,7 +145,8 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "",
       "Je mag ook rechtstreeks contact opnemen als dat sneller is."
     ].join("\n"),
-    adminVisible: true
+    adminVisible: true,
+    defaultEnabled: false
   },
   {
     type: "CONFIRMATION_HOST",
@@ -143,7 +173,8 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "Allergieen of dieetwensen:",
       "{{allergies}}"
     ].join("\n"),
-    adminVisible: true
+    adminVisible: true,
+    defaultEnabled: false
   },
   {
     type: "CONFIRMATION_EATER",
@@ -170,7 +201,8 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "Allergieen of dieetwensen:",
       "{{allergies}}"
     ].join("\n"),
-    adminVisible: true
+    adminVisible: true,
+    defaultEnabled: false
   },
   {
     type: "FALLBACK_HOST",
