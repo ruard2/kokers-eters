@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  Frequency,
   GatheringType,
   ParticipationMode,
   type Participant
@@ -98,8 +97,6 @@ export function ParticipantFormFields({ balance, participant, showActive = false
     }
   }
 
-  const gatheringType = participant?.gatheringType ?? GatheringType.BOTH;
-
   return (
     <>
       {showActive ? (
@@ -141,7 +138,7 @@ export function ParticipantFormFields({ balance, participant, showActive = false
               checked={mode === ParticipationMode.BOTH}
               onChange={() => setMode(ParticipationMode.BOTH)}
             />
-            <span>Allebei</span>
+            <span>Geen voorkeur</span>
           </label>
         </div>
         <SignupBalanceNudge balance={balance} />
@@ -180,39 +177,8 @@ export function ParticipantFormFields({ balance, participant, showActive = false
         </div>
       </section>
 
-      {/* ── Stap 3: Vorm — alleen tonen als je eet of ontvangt (niet alleen HOST-koffie heeft geen zin te vragen) ── */}
-      <section className="form-section wide">
-        <h2>Vorm</h2>
-        <div className="choice-grid">
-          <label>
-            <input
-              name="gatheringType"
-              type="radio"
-              value={GatheringType.MEAL}
-              defaultChecked={gatheringType === GatheringType.MEAL}
-            />
-            <span>Maaltijd</span>
-          </label>
-          <label>
-            <input
-              name="gatheringType"
-              type="radio"
-              value={GatheringType.COFFEE_TEA}
-              defaultChecked={gatheringType === GatheringType.COFFEE_TEA}
-            />
-            <span>Koffie/thee met iets erbij</span>
-          </label>
-          <label>
-            <input
-              name="gatheringType"
-              type="radio"
-              value={GatheringType.BOTH}
-              defaultChecked={gatheringType === GatheringType.BOTH}
-            />
-            <span>Allebei</span>
-          </label>
-        </div>
-      </section>
+      {/* Vorm: voor nu altijd maaltijd — hidden input zodat de DB-waarde klopt */}
+      <input type="hidden" name="gatheringType" value={GatheringType.MEAL} />
 
       {/* ── Als je komt eten — alleen bij EAT of BOTH ── */}
       {wantsEat ? (
@@ -221,14 +187,6 @@ export function ParticipantFormFields({ balance, participant, showActive = false
           <label>
             Met hoeveel personen kom je?
             <input name="comingWithCount" type="number" min="1" defaultValue={value(participant, "comingWithCount", "1")} />
-          </label>
-          <label>
-            Hoe vaak wil je bij een ander eten?
-            <select name="eaterFrequency" defaultValue={participant?.eaterFrequency || Frequency.MONTHLY}>
-              <option value={Frequency.BIWEEKLY}>Eens per twee weken</option>
-              <option value={Frequency.MONTHLY}>Eens per maand</option>
-              <option value={Frequency.QUARTERLY}>Eens per kwartaal</option>
-            </select>
           </label>
           <label>
             Allergieen of dieetwensen
@@ -248,14 +206,6 @@ export function ParticipantFormFields({ balance, participant, showActive = false
           <label>
             Hoeveel eters kun je ontvangen?
             <input name="hostCapacity" type="number" min="1" defaultValue={value(participant, "hostCapacity", "2")} />
-          </label>
-          <label>
-            Hoe vaak wil je ontvangen?
-            <select name="hostFrequency" defaultValue={participant?.hostFrequency || Frequency.MONTHLY}>
-              <option value={Frequency.BIWEEKLY}>Eens per twee weken</option>
-              <option value={Frequency.MONTHLY}>Eens per maand</option>
-              <option value={Frequency.QUARTERLY}>Eens per kwartaal</option>
-            </select>
           </label>
           <label>
             Adres
