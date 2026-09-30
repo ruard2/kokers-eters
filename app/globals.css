@@ -54,6 +54,11 @@ a {
   text-decoration: none;
 }
 
+.brand-org {
+  font-weight: 400;
+  color: var(--muted);
+}
+
 .admin-link {
   color: var(--muted);
   font-size: 14px;
@@ -196,6 +201,46 @@ p {
   text-align: center;
 }
 
+/* ── Landing page ── */
+.landing-panel {
+  text-align: center;
+  padding: 56px 40px 48px;
+}
+
+.landing-title {
+  font-size: clamp(2rem, 5vw, 3rem);
+  margin: 0 0 20px;
+  line-height: 1.1;
+}
+
+.landing-intro {
+  font-size: 1.1rem;
+  line-height: 1.65;
+  color: var(--muted);
+  max-width: 520px;
+  margin: 0 auto 32px;
+}
+
+.landing-cta {
+  font-size: 1rem;
+  padding: 14px 32px;
+}
+
+.landing-admin-link {
+  margin-top: 40px;
+  font-size: 0.8rem;
+}
+
+.landing-admin-link a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.landing-admin-link a:hover {
+  text-decoration: underline;
+}
+
+/* ── Guest field ── */
 .guest-field {
   display: flex;
   flex-direction: column;
