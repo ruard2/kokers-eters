@@ -1,27 +1,26 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-const orgName = process.env.APP_ORGANIZATION_NAME || "";
-const pageTitle = orgName ? `Eters & Kokers — ${orgName}` : "Eters & Kokers";
-
 export const metadata: Metadata = {
-  title: pageTitle,
-  description: "Een simpele maaltijd-randomizer voor de kerkgemeenschap.",
+  title: "Eters & Kokers",
+  description: "Een simpele maaltijd-app voor de kerkgemeenschap.",
   icons: {
     icon: "/favicon.svg"
   }
 };
 
+const orgSlug = process.env.APP_ORG_SLUG;
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const aanmeldenHref = orgSlug ? `/${orgSlug}/aanmelden` : "/";
   return (
     <html lang="nl">
       <body>
         <header className="topbar">
           <a href="/" className="brand" aria-label="Eters & Kokers">
             Eters &amp; Kokers
-            {orgName ? <span className="brand-org"> — {orgName}</span> : null}
           </a>
-          <a href="/aanmelden" className="admin-link">
+          <a href={aanmeldenHref} className="admin-link">
             Aanmelden
           </a>
         </header>

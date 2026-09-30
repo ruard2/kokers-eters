@@ -48,7 +48,7 @@ export default async function SignupPage({ searchParams }: PageProps) {
   return (
     <div className="page">
       <section className="intro">
-        <p className="eyebrow">{organization?.name || "Kerkgemeenschap"}</p>
+        <p className="eyebrow">{organization?.name || process.env.APP_ORGANIZATION_NAME || "Kerkgemeenschap"}</p>
         <h1>Schuif aan of zet je tafel open.</h1>
         <p>
           Vul kort in hoe je wilt meedoen. De app koppelt mensen per ronde automatisch en stuurt daarna de juiste mails.
