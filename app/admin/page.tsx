@@ -1,6 +1,6 @@
 import type { EmailLog, MailTemplate, MatchRound, MealMatch, Participant, PlanningSettings } from "@prisma/client";
 import type { ReactNode } from "react";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, getLocale } from "next-intl/server";
 import {
   cancelMatchAction,
   clearDemoAction,
@@ -549,9 +549,7 @@ function StepOne({
         </div>
         <div className="step-card-flat">
           <strong>{t("step1SignupCount", { n: participants.length })}</strong>
-          <p>
-            Deelnemers kunnen zelf aanmelden en voorkeuren wijzigen. Als admin kun je dezelfde lijst ook handmatig corrigeren of gezinnen toevoegen.
-          </p>
+          <p>{t("step1SignupDesc")}</p>
           <a className="button" href={adminHref(adminKey, { step: "participants", sheet: "1" })}>
             {t("step1SignupBtn")}
           </a>
@@ -633,18 +631,22 @@ function StepTwo({
   );
 }
 
+type TM = Awaited<ReturnType<typeof getTranslations<"mailTypes">>>;
+
 function StepFour({
   adminKey,
   emailLogs,
   mailTemplates,
   usingDemoData,
-  t
+  t,
+  tm
 }: {
   adminKey: string;
   emailLogs: EmailLog[];
   mailTemplates: MailTemplate[];
   usingDemoData: boolean;
   t: T;
+  tm: TM;
 }) {
   const savedTemplates = new Map(mailTemplates.map((template) => [template.type, template]));
 
@@ -662,12 +664,12 @@ function StepFour({
             <details className="mail-template-card" key={definition.type}>
               <summary>
                 <strong>
-                  {definition.label}
+                  {tm(`${definition.type}_label` as Parameters<TM>[0])}
                   <span className={`template-status ${enabled ? "on" : "off"}`}>
                     {enabled ? t("step3TemplateOn") : t("step3TemplateOff")}
                   </span>
                 </strong>
-                <span>{definition.description}</span>
+                <span>{tm(`${definition.type}_desc` as Parameters<TM>[0])}</span>
               </summary>
               <form action={saveMailTemplateAction} className="mail-template-form">
                 <input type="hidden" name="adminKey" value={adminKey} />
@@ -843,6 +845,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const currentStep = activeStep(query.step);
   const showSheet = first(query.sheet) === "1";
   const t = await getTranslations("admin");
+  const tm = await getTranslations("mailTypes");
 
   const adminContext = resolveAdminContext(key);
   if (!adminContext) {
@@ -957,7 +960,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
         <StepTwo adminKey={key} defaultMonth={defaultMonth} matches={matches} participants={participants} planningSettings={planningSettings} rounds={planningRounds} showSheet={showSheet} usingDemoData={usingDemoData} t={t} />
       ) : null}
       {currentStep === "mails" ? (
-        <StepFour adminKey={key} emailLogs={emailLogs} mailTemplates={mailTemplates} usingDemoData={usingDemoData} t={t} />
+        <StepFour adminKey={key} emailLogs={emailLogs} mailTemplates={mailTemplates} usingDemoData={usingDemoData} t={t} tm={tm} />
       ) : null}
       {currentStep === "summary" ? (
         <StepFive adminKey={key} defaultMonth={defaultMonth} emailLogs={emailLogs} matches={matches} participants={participants} planningSettings={planningSettings} rounds={rounds} usingDemoData={usingDemoData} t={t} />

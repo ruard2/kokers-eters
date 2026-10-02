@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 type CopyQrButtonProps = {
   value: string;
 };
 
 export function CopyQrButton({ value }: CopyQrButtonProps) {
+  const t = useTranslations("copy");
   const [copied, setCopied] = useState<"idle" | "image" | "link">("idle");
 
   async function copy() {
@@ -25,7 +27,8 @@ export function CopyQrButton({ value }: CopyQrButtonProps) {
     window.setTimeout(() => setCopied("idle"), 1800);
   }
 
-  const label = copied === "image" ? "QR gekopieerd" : copied === "link" ? "QR-link gekopieerd" : "Kopieer QR-code";
+  const label =
+    copied === "image" ? t("qrCopied") : copied === "link" ? t("qrLinkCopied") : t("copyQr");
 
   return (
     <button className="secondary" onClick={copy} type="button">

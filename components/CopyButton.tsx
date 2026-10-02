@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 type CopyButtonProps = {
   value: string;
-  label?: string;
 };
 
-export function CopyButton({ value, label = "Kopieer link" }: CopyButtonProps) {
+export function CopyButton({ value }: CopyButtonProps) {
+  const t = useTranslations("copy");
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -18,7 +19,7 @@ export function CopyButton({ value, label = "Kopieer link" }: CopyButtonProps) {
 
   return (
     <button className="secondary" onClick={copy} type="button">
-      {copied ? "Gekopieerd" : label}
+      {copied ? t("copied") : t("copyLink")}
     </button>
   );
 }

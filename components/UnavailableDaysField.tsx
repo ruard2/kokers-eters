@@ -1,16 +1,33 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
-const days = ["Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag", "Zondag"];
+const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+type DayKey = (typeof DAY_KEYS)[number];
 
-function initialUnavailableDays(value: string) {
+const DUTCH_NAMES: Record<DayKey, string> = {
+  Mon: "Maandag",
+  Tue: "Dinsdag",
+  Wed: "Woensdag",
+  Thu: "Donderdag",
+  Fri: "Vrijdag",
+  Sat: "Zaterdag",
+  Sun: "Zondag"
+};
+
+function initialUnavailableDays(value: string): Set<DayKey> {
   const normalized = value.toLowerCase();
-  if (!normalized || normalized.includes("geen")) {
-    return [];
+  if (!normalized || normalized.includes("geen") || normalized.includes("none")) {
+    return new Set();
   }
-
-  return days.filter((day) => normalized.includes(day.toLowerCase()));
+  const result = new Set<DayKey>();
+  for (const key of DAY_KEYS) {
+    if (normalized.includes(DUTCH_NAMES[key].toLowerCase())) {
+      result.add(key);
+    }
+  }
+  return result;
 }
 
 type UnavailableDaysFieldProps = {
@@ -19,19 +36,23 @@ type UnavailableDaysFieldProps = {
 };
 
 export function UnavailableDaysField({ name, defaultValue = "" }: UnavailableDaysFieldProps) {
+  const t = useTranslations("days");
   const initialDays = useMemo(() => initialUnavailableDays(defaultValue), [defaultValue]);
-  const [unavailableDays, setUnavailableDays] = useState(() => new Set(initialDays));
-  const value = days.filter((day) => unavailableDays.has(day)).join(", ");
+  const [unavailableDays, setUnavailableDays] = useState<Set<DayKey>>(initialDays);
 
-  function toggleDay(day: string) {
+  // Store canonical Dutch names for database compatibility
+  const value = DAY_KEYS.filter((key) => unavailableDays.has(key))
+    .map((key) => DUTCH_NAMES[key])
+    .join(", ");
+
+  function toggleDay(key: DayKey) {
     setUnavailableDays((current) => {
       const next = new Set(current);
-      if (next.has(day)) {
-        next.delete(day);
+      if (next.has(key)) {
+        next.delete(key);
       } else {
-        next.add(day);
+        next.add(key);
       }
-
       return next;
     });
   }
@@ -39,20 +60,20 @@ export function UnavailableDaysField({ name, defaultValue = "" }: UnavailableDay
   return (
     <div className="day-picker">
       <input name={name} type="hidden" value={value} />
-      <p>Standaard zijn alle dagen geselecteerd. Klik op dagen waarop je niet kunt.</p>
+      <p>{t("hint")}</p>
       <div className="day-grid">
-        {days.map((day) => {
-          const unavailable = unavailableDays.has(day);
+        {DAY_KEYS.map((key) => {
+          const unavailable = unavailableDays.has(key);
           return (
             <button
               aria-pressed={!unavailable}
               className={`day-button ${unavailable ? "unavailable" : "available"}`}
-              key={day}
-              onClick={() => toggleDay(day)}
+              key={key}
+              onClick={() => toggleDay(key)}
               type="button"
             >
-              <span>{day}</span>
-              <small>{unavailable ? "Kan niet" : "Kan wel"}</small>
+              <span>{t(key)}</span>
+              <small>{unavailable ? t("cannotLabel") : t("canLabel")}</small>
             </button>
           );
         })}

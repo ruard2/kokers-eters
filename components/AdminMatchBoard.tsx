@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 type BoardParticipant = {
   id: string;
@@ -55,18 +56,6 @@ type AdminMatchBoardProps = {
 
 const manyMatchesLimit = 14;
 
-function modeLabel(value: string) {
-  if (value === "EAT") return "Eten";
-  if (value === "HOST") return "Koken";
-  return "Allebei";
-}
-
-function gatheringLabel(value: string) {
-  if (value === "MEAL") return "Maaltijd";
-  if (value === "COFFEE_TEA") return "Koffie/thee";
-  return "Allebei";
-}
-
 function sameDrag(a: DragPayload | null, b: DragPayload) {
   return Boolean(a && a.matchId === b.matchId && a.side === b.side);
 }
@@ -83,7 +72,6 @@ function noMatchTokens(value: string | null) {
   if (!value) {
     return [];
   }
-
   return value
     .split(/[\n,;]+/)
     .map((token) => token.trim())
@@ -91,36 +79,31 @@ function noMatchTokens(value: string | null) {
 }
 
 function buildAdminNoMatchMap(participants: BoardRosterParticipant[]) {
-  const byEmail = new Map(participants.map((participant) => [participant.email.toLowerCase(), participant.id]));
-  const byName = new Map(participants.map((participant) => [participant.name.toLowerCase(), participant.id]));
-  const byId = new Map(participants.map((participant) => [participant.id, participant.id]));
+  const byEmail = new Map(participants.map((p) => [p.email.toLowerCase(), p.id]));
+  const byName = new Map(participants.map((p) => [p.name.toLowerCase(), p.id]));
+  const byId = new Map(participants.map((p) => [p.id, p.id]));
   const blocked = new Map<string, Set<string>>();
 
   for (const participant of participants) {
     const blockedIds = new Set<string>();
-
     for (const rawToken of noMatchTokens(participant.adminNoMatch)) {
       const normalizedToken = rawToken.toLowerCase().replace(/^#/, "");
       const rowNumber = Number.parseInt(normalizedToken, 10);
-
       if (/^\d+$/.test(normalizedToken) && participants[rowNumber - 1]) {
         blockedIds.add(participants[rowNumber - 1].id);
         continue;
       }
-
       const matchedId =
         byEmail.get(rawToken.toLowerCase()) || byName.get(rawToken.toLowerCase()) || byId.get(rawToken) || null;
       if (matchedId) {
         blockedIds.add(matchedId);
       }
     }
-
     blockedIds.delete(participant.id);
     if (blockedIds.size > 0) {
       blocked.set(participant.id, blockedIds);
     }
   }
-
   return blocked;
 }
 
@@ -129,17 +112,14 @@ function adminBlocksMatch(host: BoardParticipant, eater: BoardParticipant, block
 }
 
 function cloneMatches(matches: BoardMatch[]) {
-  return matches.map((match) => ({ ...match, host: { ...match.host }, eater: { ...match.eater } }));
+  return matches.map((m) => ({ ...m, host: { ...m.host }, eater: { ...m.eater } }));
 }
 
 function swapSide(matches: BoardMatch[], payload: DragPayload, targetMatchId: string) {
   const nextMatches = cloneMatches(matches);
-  const source = nextMatches.find((item) => item.id === payload.matchId);
-  const target = nextMatches.find((item) => item.id === targetMatchId);
-
-  if (!source || !target || source.id === target.id) {
-    return nextMatches;
-  }
+  const source = nextMatches.find((m) => m.id === payload.matchId);
+  const target = nextMatches.find((m) => m.id === targetMatchId);
+  if (!source || !target || source.id === target.id) return nextMatches;
 
   if (payload.side === "host") {
     const sourceHost = source.host;
@@ -153,65 +133,53 @@ function swapSide(matches: BoardMatch[], payload: DragPayload, targetMatchId: st
     target.eater = sourceEater;
     target.partySize = sourcePartySize;
   }
-
   return nextMatches;
 }
 
-function validateConnection(match: BoardMatch, adminNoMatch: Map<string, Set<string>>): string | null {
+type TBoard = ReturnType<typeof useTranslations<"board">>;
+
+function validateConnection(match: BoardMatch, adminNoMatch: Map<string, Set<string>>, t: TBoard): string | null {
   if (match.host.id === match.eater.id) {
-    return `${match.host.name} kan niet aan zichzelf gekoppeld worden.`;
+    return t("errSelfMatch", { name: match.host.name });
   }
-
   if (!match.host.hostCapacity || match.host.hostCapacity < match.partySize) {
-    return `${match.host.name} heeft ${match.host.hostCapacity || 0} plekken, groep is ${match.partySize}.`;
+    return t("errCapacity", { name: match.host.name, cap: match.host.hostCapacity ?? 0, size: match.partySize });
   }
-
   if (!compatibleChoice(match.host.gatheringType, match.eater.gatheringType)) {
-    return `${match.host.name} en ${match.eater.name} hebben een andere vorm-keuze.`;
+    return t("errGathering", { host: match.host.name, eater: match.eater.name });
   }
-
   if (adminBlocksMatch(match.host, match.eater, adminNoMatch)) {
-    return `${match.host.name} en ${match.eater.name} mogen niet samen gematcht worden.`;
+    return t("errAdminBlock", { host: match.host.name, eater: match.eater.name });
   }
-
   return null;
 }
 
-function validatePairUniqueness(matches: BoardMatch[]) {
+function validatePairUniqueness(matches: BoardMatch[], t: TBoard) {
   const pairs = new Set<string>();
-
   for (const match of matches) {
-    if (match.status === "CANCELLED") {
-      continue;
-    }
-
+    if (match.status === "CANCELLED") continue;
     const key = pairKey(match.host.id, match.eater.id);
     if (pairs.has(key)) {
-      return `Dubbele verbinding: ${match.host.name} met ${match.eater.name}.`;
+      return t("errDuplicate", { host: match.host.name, eater: match.eater.name });
     }
     pairs.add(key);
-
   }
-
   return null;
 }
 
-function validateHostTotals(matches: BoardMatch[], hostIds: Set<string>) {
+function validateHostTotals(matches: BoardMatch[], hostIds: Set<string>, t: TBoard) {
   const totals = new Map<string, number>();
-
   for (const match of matches) {
     if (match.status !== "CANCELLED" && hostIds.has(match.host.id)) {
       totals.set(match.host.id, (totals.get(match.host.id) || 0) + match.partySize);
     }
   }
-
   for (const [hostId, total] of totals) {
-    const host = matches.find((match) => match.host.id === hostId)?.host;
+    const host = matches.find((m) => m.host.id === hostId)?.host;
     if (host && (!host.hostCapacity || total > host.hostCapacity)) {
-      return `${host.name} heeft ${host.hostCapacity || 0} plekken, maar krijgt zo ${total} personen.`;
+      return t("errOverCapacity", { name: host.name, cap: host.hostCapacity ?? 0, total });
     }
   }
-
   return null;
 }
 
@@ -219,62 +187,48 @@ function validateMove(
   matches: BoardMatch[],
   payload: DragPayload,
   targetMatchId: string,
-  adminNoMatch: Map<string, Set<string>>
+  adminNoMatch: Map<string, Set<string>>,
+  t: TBoard
 ): MoveValidation {
-  const source = matches.find((match) => match.id === payload.matchId);
-  const target = matches.find((match) => match.id === targetMatchId);
+  const source = matches.find((m) => m.id === payload.matchId);
+  const target = matches.find((m) => m.id === targetMatchId);
 
-  if (!source || !target) {
-    return { ok: false, reason: "Verbinding niet gevonden." };
-  }
-
-  if (source.id === target.id) {
-    return { ok: false, reason: "Huidige verbinding." };
-  }
-
+  if (!source || !target) return { ok: false, reason: t("errNotFound") };
+  if (source.id === target.id) return { ok: false, reason: t("errSelf") };
   if (source.status !== "DRAFT" || target.status !== "DRAFT") {
-    return { ok: false, reason: "Alleen conceptverbindingen zijn aanpasbaar." };
+    return { ok: false, reason: t("errDraftOnly") };
   }
 
   const nextMatches = swapSide(matches, payload, targetMatchId);
-  const nextSource = nextMatches.find((match) => match.id === source.id);
-  const nextTarget = nextMatches.find((match) => match.id === target.id);
+  const nextSource = nextMatches.find((m) => m.id === source.id);
+  const nextTarget = nextMatches.find((m) => m.id === target.id);
 
-  if (!nextSource || !nextTarget) {
-    return { ok: false, reason: "Verbinding niet gevonden." };
-  }
+  if (!nextSource || !nextTarget) return { ok: false, reason: t("errNotFound") };
 
-  const sourceError = validateConnection(nextSource, adminNoMatch);
-  if (sourceError) {
-    return { ok: false, reason: sourceError };
-  }
+  const sourceError = validateConnection(nextSource, adminNoMatch, t);
+  if (sourceError) return { ok: false, reason: sourceError };
 
-  const targetError = validateConnection(nextTarget, adminNoMatch);
-  if (targetError) {
-    return { ok: false, reason: targetError };
-  }
+  const targetError = validateConnection(nextTarget, adminNoMatch, t);
+  if (targetError) return { ok: false, reason: targetError };
 
-  const pairError = validatePairUniqueness(nextMatches);
-  if (pairError) {
-    return { ok: false, reason: pairError };
-  }
+  const pairError = validatePairUniqueness(nextMatches, t);
+  if (pairError) return { ok: false, reason: pairError };
 
   const affectedHosts = new Set([nextSource.host.id, nextTarget.host.id]);
-  const error = validateHostTotals(nextMatches, affectedHosts);
-  if (error) {
-    return { ok: false, reason: error };
-  }
+  const error = validateHostTotals(nextMatches, affectedHosts, t);
+  if (error) return { ok: false, reason: error };
 
-  return { ok: true, reason: "Past." };
+  return { ok: true, reason: t("validOk") };
 }
 
 function validationFor(
   matches: BoardMatch[],
   payload: DragPayload | null,
   targetMatchId: string,
-  adminNoMatch: Map<string, Set<string>>
+  adminNoMatch: Map<string, Set<string>>,
+  t: TBoard
 ) {
-  return payload ? validateMove(matches, payload, targetMatchId, adminNoMatch) : null;
+  return payload ? validateMove(matches, payload, targetMatchId, adminNoMatch, t) : null;
 }
 
 function parseDragPayload(event: React.DragEvent) {
@@ -287,7 +241,6 @@ function parseDragPayload(event: React.DragEvent) {
   } catch {
     return null;
   }
-
   return null;
 }
 
@@ -300,7 +253,8 @@ function ParticipantTile({
   participant,
   selected,
   side,
-  simple
+  simple,
+  t
 }: {
   editable: boolean;
   match: BoardMatch;
@@ -311,6 +265,7 @@ function ParticipantTile({
   selected: DragPayload | null;
   side: "host" | "eater";
   simple: boolean;
+  t: TBoard;
 }) {
   const payload = { matchId: match.id, side };
   const isHost = side === "host";
@@ -318,30 +273,42 @@ function ParticipantTile({
 
   return (
     <button
-      aria-label={`${isHost ? "Host" : "Eter"} ${participant.name}`}
+      aria-label={`${isHost ? t("tileHost") : t("tileEater")} ${participant.name}`}
       className={`match-tile ${isHost ? "host-tile" : "eater-tile"} ${sameDrag(selected, payload) ? "selected" : ""}`}
       disabled={!editable}
       draggable={editable}
       onClick={() => onSelect(payload)}
       onDragEnd={onDragEnd}
       onDragStart={(event) => onDragStart(event, payload)}
-      title={editable ? "Versleep naar een andere verbinding" : "Niet aanpasbaar"}
+      title={editable ? t("dragHint") : t("lockedHint")}
       type="button"
     >
-      <span className="tile-kicker">{isHost ? "Host" : "Eter"}</span>
+      <span className="tile-kicker">{isHost ? t("tileHost") : t("tileEater")}</span>
       <strong>{participant.name}</strong>
-      {!simple ? <span className="tile-meta">{modeLabel(participant.mode)}</span> : null}
+      {!simple ? (
+        <span className="tile-meta">
+          {isHost ? t("modeHost") : participant.mode === "EAT" ? t("modeEat") : participant.mode === "HOST" ? t("modeHost") : t("modeBoth")}
+        </span>
+      ) : null}
       {isHost ? (
         <>
           <span className={capacityProblem ? "tile-warning" : "tile-meta"}>
-            Cap. {participant.hostCapacity ?? "-"} / groep {match.partySize}
+            {t("tileCapacity", { cap: participant.hostCapacity ?? "-", group: match.partySize })}
           </span>
           {!simple && participant.cannotHostDays ? <span className="tile-extra">{participant.cannotHostDays}</span> : null}
         </>
       ) : (
         <>
-          <span className="tile-meta">{match.partySize} persoon/personen</span>
-          {!simple ? <span className="tile-meta">{gatheringLabel(participant.gatheringType)}</span> : null}
+          <span className="tile-meta">{t("tilePartySize", { n: match.partySize })}</span>
+          {!simple ? (
+            <span className="tile-meta">
+              {participant.gatheringType === "MEAL"
+                ? t("gatheringMeal")
+                : participant.gatheringType === "COFFEE_TEA"
+                ? t("gatheringCoffee")
+                : t("gatheringBoth")}
+            </span>
+          ) : null}
           {!simple && participant.allergies ? <span className="tile-extra">{participant.allergies}</span> : null}
         </>
       )}
@@ -350,6 +317,7 @@ function ParticipantTile({
 }
 
 export function AdminMatchBoard({ adminKey, disabled, initialMatches, participants, saveChanges }: AdminMatchBoardProps) {
+  const t = useTranslations("board");
   const [matches, setMatches] = useState(initialMatches);
   const [selected, setSelected] = useState<DragPayload | null>(null);
   const [busy, setBusy] = useState(false);
@@ -361,24 +329,22 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
   const validations = useMemo(() => {
     const result = new Map<string, MoveValidation>();
     for (const match of matches) {
-      result.set(match.id, validationFor(matches, selected, match.id, adminNoMatch) || { ok: false, reason: "" });
+      result.set(match.id, validationFor(matches, selected, match.id, adminNoMatch, t) || { ok: false, reason: "" });
     }
     return result;
-  }, [adminNoMatch, matches, selected]);
+  }, [adminNoMatch, matches, selected, t]);
 
   const viableCount = useMemo(
-    () => (selected ? matches.filter((match) => validations.get(match.id)?.ok).length : 0),
+    () => (selected ? matches.filter((m) => validations.get(m.id)?.ok).length : 0),
     [matches, selected, validations]
   );
-  const editableCount = matches.filter((match) => !disabled && match.status === "DRAFT").length;
+  const editableCount = matches.filter((m) => !disabled && m.status === "DRAFT").length;
 
   async function commitSwap(payload: DragPayload, targetMatchId: string) {
-    const validation = validateMove(matches, payload, targetMatchId, adminNoMatch);
+    const validation = validateMove(matches, payload, targetMatchId, adminNoMatch, t);
     if (disabled || busy || !validation.ok) {
       setError(validation.reason);
-      if (payload.matchId === targetMatchId) {
-        setSelected(null);
-      }
+      if (payload.matchId === targetMatchId) setSelected(null);
       return;
     }
 
@@ -391,7 +357,7 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
 
     if (!saveChanges) {
       setBusy(false);
-      setMessage("Concept aangepast in demo. Niet opgeslagen in database.");
+      setMessage(t("savedDemo"));
       return;
     }
 
@@ -399,39 +365,30 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
       const response = await fetch("/api/admin/matches/reassign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          adminKey,
-          sourceMatchId: payload.matchId,
-          targetMatchId,
-          side: payload.side
-        })
+        body: JSON.stringify({ adminKey, sourceMatchId: payload.matchId, targetMatchId, side: payload.side })
       });
       const data = (await response.json()) as { error?: string; matches?: BoardMatch[] };
 
       if (!response.ok || !data.matches) {
-        throw new Error(data.error || "Wijziging niet opgeslagen.");
+        throw new Error(data.error || t("saveError"));
       }
 
       setMatches(data.matches);
-      setMessage("Concept aangepast.");
+      setMessage(t("savedOk"));
     } catch (caught) {
       setMatches(previousMatches);
-      setError(caught instanceof Error ? caught.message : "Wijziging niet opgeslagen.");
+      setError(caught instanceof Error ? caught.message : t("saveError"));
     } finally {
       setBusy(false);
     }
   }
 
   function handleSelect(payload: DragPayload) {
-    if (disabled || busy) {
-      return;
-    }
-
+    if (disabled || busy) return;
     if (selected && selected.matchId !== payload.matchId) {
       void commitSwap(selected, payload.matchId);
       return;
     }
-
     setError(null);
     setMessage(null);
     setSelected((current) => (sameDrag(current, payload) ? null : payload));
@@ -449,37 +406,37 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
   function handleDrop(event: React.DragEvent, targetMatchId: string) {
     event.preventDefault();
     const payload = parseDragPayload(event);
-    if (payload) {
-      void commitSwap(payload, targetMatchId);
-    }
+    if (payload) void commitSwap(payload, targetMatchId);
   }
 
   function renderBoard(fullscreen: boolean) {
     const showOnlyViable = Boolean(selected && matches.length > manyMatchesLimit);
     const visibleMatches = showOnlyViable
-      ? matches.filter((match) => match.id === selected?.matchId || validations.get(match.id)?.ok)
+      ? matches.filter((m) => m.id === selected?.matchId || validations.get(m.id)?.ok)
       : matches;
     const hiddenCount = matches.length - visibleMatches.length;
 
     if (matches.length === 0) {
-      return <div className="board-empty">Nog geen conceptverbindingen.</div>;
+      return <div className="board-empty">{t("noMatches")}</div>;
     }
 
     return (
       <div className={`match-board-shell ${fullscreen ? "fullscreen" : ""}`}>
         <div className="board-toolbar">
           <div className="board-summary">
-            <strong>{matches.length} verbindingen</strong>
-            {selected ? <span>{viableCount} mogelijke ruilen</span> : <span>{editableCount} aanpasbaar</span>}
+            <strong>{t("connections", { n: matches.length })}</strong>
+            {selected
+              ? <span>{t("possibleSwaps", { n: viableCount })}</span>
+              : <span>{t("editable", { n: editableCount })}</span>}
           </div>
           <div className="board-actions">
             {selected ? (
               <button className="small secondary" onClick={() => setSelected(null)} type="button">
-                Selectie wissen
+                {t("clearSelection")}
               </button>
             ) : null}
             <button className="small secondary" onClick={() => setExpanded(!fullscreen)} type="button">
-              {fullscreen ? "Sluiten" : "Groot bord"}
+              {fullscreen ? t("collapse") : t("expand")}
             </button>
           </div>
         </div>
@@ -487,15 +444,13 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
         {message ? <div className="notice success board-notice">{message}</div> : null}
         {error ? <div className="notice error board-notice">{error}</div> : null}
         {editableCount > 0 ? (
-          <div className="board-help">
-            Sleep een host of eter naar een andere regel. Groen kan, rood kan niet. Klik-klik kan ook.
-          </div>
+          <div className="board-help">{t("dragHelp")}</div>
         ) : (
-          <div className="notice board-notice">
-            Deze ronde is niet meer aanpasbaar. Zet hem terug naar concept als er nog geen echte mails zijn verstuurd.
-          </div>
+          <div className="notice board-notice">{t("lockedNotice")}</div>
         )}
-        {hiddenCount > 0 ? <div className="notice board-notice">{hiddenCount} niet-passende verbindingen verborgen.</div> : null}
+        {hiddenCount > 0 ? (
+          <div className="notice board-notice">{t("hiddenCount", { n: hiddenCount })}</div>
+        ) : null}
 
         <div className={`match-board ${busy ? "busy" : ""} ${selected ? "checking" : ""} ${fullscreen ? "simple" : ""}`}>
           {visibleMatches.map((match, index) => {
@@ -503,11 +458,7 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
             const validation = validations.get(match.id);
             const isSource = selected?.matchId === match.id;
             const dropClass = selected
-              ? isSource
-                ? "drop-source"
-                : validation?.ok
-                  ? "drop-ok"
-                  : "drop-bad"
+              ? isSource ? "drop-source" : validation?.ok ? "drop-ok" : "drop-bad"
               : "";
 
             return (
@@ -534,6 +485,7 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
                   selected={selected}
                   side="host"
                   simple={fullscreen}
+                  t={t}
                 />
                 <div aria-hidden="true" className="connection-track">
                   <span className="connection-line" />
@@ -549,6 +501,7 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
                   selected={selected}
                   side="eater"
                   simple={fullscreen}
+                  t={t}
                 />
               </div>
             );
@@ -562,7 +515,7 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
     <>
       {renderBoard(false)}
       {expanded ? (
-        <div className="match-board-overlay" role="dialog" aria-label="Groot matchbord" aria-modal="true">
+        <div className="match-board-overlay" role="dialog" aria-label={t("ariaLabel")} aria-modal="true">
           <div className="match-board-modal">{renderBoard(true)}</div>
         </div>
       ) : null}
