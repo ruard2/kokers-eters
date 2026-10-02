@@ -65,6 +65,50 @@ a {
   text-decoration: none;
 }
 
+.topbar-right {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.lang-switcher {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+}
+
+.lang-btn {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 500;
+  gap: 3px;
+  padding: 3px 7px;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.lang-btn:hover {
+  background: var(--green-50, #f0faf2);
+  color: var(--ink);
+}
+
+.lang-btn.active {
+  background: var(--green-100, #d6f0dd);
+  border-color: var(--green-200, #a7d9b4);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.lang-label {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
 .page {
   margin: 0 auto;
   max-width: 1120px;

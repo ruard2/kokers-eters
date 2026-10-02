@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { submitHostDates } from "@/app/actions";
 import { displayDate, displayMonth, jsonDateList } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,9 @@ function flag(value: string | string[] | undefined) {
 export default async function HostPage({ params, searchParams }: PageProps) {
   const { token } = await params;
   const query = (await searchParams) || {};
+  const t = await getTranslations("host");
+  const tc = await getTranslations("common");
+
   const match = await prisma.mealMatch.findUnique({
     where: { hostToken: token },
     include: { host: true, eater: true, round: true }
@@ -30,27 +34,26 @@ export default async function HostPage({ params, searchParams }: PageProps) {
   const justSent = flag(query.sent);
   const dateChosen = !!match.chosenDate;
 
-  // Done state: host just sent dates, or eater already confirmed a date
   if (justSent || dateChosen) {
     return (
       <div className="page narrow">
         <section className="panel">
-          <p className="eyebrow">Koker</p>
-          <h1>{dateChosen ? "Afgesproken!" : "Verstuurd!"}</h1>
+          <p className="eyebrow">{t("eyebrow")}</p>
+          <h1>{dateChosen ? t("doneConfirmed") : t("doneSent")}</h1>
           <p>
-            Voor {displayMonth(match.round.month)} ben je gekoppeld aan <strong>{match.eater.name}</strong>.
+            {t("coupledTo", { month: displayMonth(match.round.month), name: match.eater.name })}
           </p>
           {dateChosen ? (
             <div className="notice success">
-              Definitieve datum: {displayDate(match.chosenDate!)}.
+              {t("finalDate", { date: displayDate(match.chosenDate!) })}
             </div>
           ) : (
             <div className="notice success">
-              De eter ontvangt een mail met jouw beschikbare dagen en kan nu een dag kiezen.
+              {t("eaterWillChoose")}
             </div>
           )}
           <p style={{ marginTop: "1.5rem", color: "var(--color-muted, #5e6b62)" }}>
-            Je kunt dit venster sluiten.
+            {tc("closeWindow")}
           </p>
         </section>
       </div>
@@ -60,40 +63,42 @@ export default async function HostPage({ params, searchParams }: PageProps) {
   return (
     <div className="page narrow">
       <section className="panel">
-        <p className="eyebrow">Koker</p>
-        <h1>Dagen kiezen</h1>
+        <p className="eyebrow">{t("eyebrow")}</p>
+        <h1>{t("pickTitle")}</h1>
         <p>
-          Voor {displayMonth(match.round.month)} ben je gekoppeld aan <strong>{match.eater.name}</strong>.
+          {t("coupledTo", { month: displayMonth(match.round.month), name: match.eater.name })}
         </p>
 
-        {query.error === "dates" ? <div className="notice error">Kies minimaal een dag.</div> : null}
+        {query.error === "dates" ? (
+          <div className="notice error">{t("errorNoDates")}</div>
+        ) : null}
 
         <div className="summary-grid">
           <div>
-            <span className="label">Groep</span>
-            <strong>{match.partySize} persoon/personen</strong>
+            <span className="label">{t("labelGroup")}</span>
+            <strong>{t("groupValue", { n: match.partySize })}</strong>
           </div>
           <div>
-            <span className="label">Allergieën</span>
-            <strong>{match.eater.allergies || "Geen bijzonderheden opgegeven"}</strong>
+            <span className="label">{t("labelAllergies")}</span>
+            <strong>{match.eater.allergies || t("noAllergies")}</strong>
           </div>
         </div>
 
         <form action={submitHostDates} className="stack">
           <input type="hidden" name="token" value={token} />
           <label>
-            Vraag of opmerking voor de eter
+            {t("noteLabel")}
             <textarea name="hostNote" rows={3} defaultValue={match.hostNote || ""} />
           </label>
           <div>
-            <span className="label">Mogelijke dagen</span>
+            <span className="label">{t("datesLabel")}</span>
             <div className="date-grid">
               {[0, 1, 2, 3, 4].map((index) => (
                 <input key={index} type="date" name={`date${index + 1}`} defaultValue={dates[index] || ""} />
               ))}
             </div>
           </div>
-          <button type="submit">Dagen naar eter sturen</button>
+          <button type="submit">{t("submitDates")}</button>
         </form>
       </section>
     </div>

@@ -2,6 +2,7 @@ import { registerParticipant } from "@/app/actions";
 import { ParticipantFormFields } from "@/components/ParticipantFormFields";
 import { prisma } from "@/lib/db";
 import { calculateSignupBalance } from "@/lib/signup-balance";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,8 @@ export default async function SignupPage({ searchParams }: PageProps) {
   const params = (await searchParams) || {};
   const error = first(params.error);
   const requestedOrganizationId = first(params.organization) || "";
+  const t = await getTranslations("signup");
+
   const organization = requestedOrganizationId
     ? await prisma.organization.findUnique({
         where: { id: requestedOrganizationId },
@@ -44,22 +47,19 @@ export default async function SignupPage({ searchParams }: PageProps) {
       })
     : null;
   const balance = await getSignupBalance(organization?.id || null);
+  const orgName = organization?.name || process.env.APP_ORGANIZATION_NAME || t("eyebrow");
 
   return (
     <div className="page">
       <section className="intro">
-        <p className="eyebrow">{organization?.name || process.env.APP_ORGANIZATION_NAME || "Kerkgemeenschap"}</p>
-        <h1>Schuif aan of zet je tafel open.</h1>
-        <p>
-          Vul kort in hoe je wilt meedoen. De app koppelt mensen per ronde automatisch en stuurt daarna de juiste mails.
-        </p>
+        <p className="eyebrow">{orgName}</p>
+        <h1>{t("title")}</h1>
+        <p>{t("intro")}</p>
       </section>
 
       {error ? (
         <div className="notice error">
-          {error === "address"
-            ? "Vul een adres in als je eters ontvangt."
-            : "Vul minimaal naam, e-mail en WhatsAppnummer in."}
+          {error === "address" ? t("errorAddress") : t("errorRequired")}
         </div>
       ) : null}
 
@@ -71,7 +71,7 @@ export default async function SignupPage({ searchParams }: PageProps) {
         />
         <ParticipantFormFields balance={balance} />
         <div className="actions wide">
-          <button type="submit">Aanmelden</button>
+          <button type="submit">{t("submit")}</button>
         </div>
       </form>
     </div>

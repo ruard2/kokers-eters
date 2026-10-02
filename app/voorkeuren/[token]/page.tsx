@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { updatePreferences } from "@/app/actions";
 import { ParticipantFormFields } from "@/components/ParticipantFormFields";
 import { prisma } from "@/lib/db";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ function hasFlag(value: string | string[] | undefined) {
 export default async function PreferencesPage({ params, searchParams }: PageProps) {
   const { token } = await params;
   const query = (await searchParams) || {};
+  const t = await getTranslations("preferences");
+
   const participant = await prisma.participant.findUnique({
     where: { preferenceToken: token }
   });
@@ -28,19 +31,19 @@ export default async function PreferencesPage({ params, searchParams }: PageProp
   return (
     <div className="page">
       <section className="intro compact">
-        <p className="eyebrow">Persoonlijke link</p>
-        <h1>Voorkeuren wijzigen</h1>
-        <p>Pas aan hoe je mee wilt doen. Deze link is persoonlijk, dus deel hem niet breed.</p>
+        <p className="eyebrow">{t("eyebrow")}</p>
+        <h1>{t("title")}</h1>
+        <p>{t("intro")}</p>
       </section>
 
-      {hasFlag(query.saved) ? <div className="notice success">Je voorkeuren zijn opgeslagen.</div> : null}
-      {hasFlag(query.error) ? <div className="notice error">Vul minimaal naam, e-mail en WhatsAppnummer in.</div> : null}
+      {hasFlag(query.saved) ? <div className="notice success">{t("saved")}</div> : null}
+      {hasFlag(query.error) ? <div className="notice error">{t("errorRequired")}</div> : null}
 
       <form action={updatePreferences} className="panel form-grid">
         <input type="hidden" name="token" value={token} />
         <ParticipantFormFields participant={participant} showActive />
         <div className="actions wide">
-          <button type="submit">Voorkeuren opslaan</button>
+          <button type="submit">{t("submit")}</button>
         </div>
       </form>
     </div>

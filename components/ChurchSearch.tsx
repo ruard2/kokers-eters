@@ -3,7 +3,27 @@
 import { useState } from "react";
 import type { OrgInfo } from "@/lib/org-by-slug";
 
-export function ChurchSearch({ orgs }: { orgs: OrgInfo[] }) {
+type Props = {
+  orgs: OrgInfo[];
+  label: string;
+  placeholder: string;
+  confirmText: string;
+  foundEyebrow: string;
+  otherChurch: string;
+  notFoundPrefix: string;
+  signupButtonPrefix: string;
+};
+
+export function ChurchSearch({
+  orgs,
+  label,
+  placeholder,
+  confirmText,
+  foundEyebrow,
+  otherChurch,
+  notFoundPrefix,
+  signupButtonPrefix
+}: Props) {
   const [query, setQuery] = useState("");
   const [confirmed, setConfirmed] = useState<OrgInfo | null>(null);
 
@@ -18,17 +38,21 @@ export function ChurchSearch({ orgs }: { orgs: OrgInfo[] }) {
         })
       : [];
 
+  const signupLabel = (name: string) =>
+    signupButtonPrefix.replace("{name}", name);
+  const notFoundMsg = (q: string) => notFoundPrefix.replace("{query}", q);
+
   if (confirmed) {
     return (
       <div className="church-confirmed">
-        <p className="eyebrow">Gevonden</p>
+        <p className="eyebrow">{foundEyebrow}</p>
         <h2 className="confirmed-name">{confirmed.name}</h2>
         <a className="button" href={`/${confirmed.slug}/aanmelden`}>
-          Aanmelden bij {confirmed.name}
+          {signupLabel(confirmed.name)}
         </a>
         <p>
           <button className="link-btn" onClick={() => setConfirmed(null)}>
-            Andere kerk zoeken
+            {otherChurch}
           </button>
         </p>
       </div>
@@ -38,13 +62,13 @@ export function ChurchSearch({ orgs }: { orgs: OrgInfo[] }) {
   return (
     <div className="church-search">
       <label htmlFor="kerk-zoeken" className="search-label">
-        Zoek je kerkgemeenschap
+        {label}
       </label>
       <input
         id="kerk-zoeken"
         className="search-input"
         type="search"
-        placeholder="Typ de naam van je kerk…"
+        placeholder={placeholder}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         autoComplete="off"
@@ -59,17 +83,14 @@ export function ChurchSearch({ orgs }: { orgs: OrgInfo[] }) {
                 onClick={() => setConfirmed(org)}
               >
                 <span className="result-name">{org.name}</span>
-                <span className="result-hint">Is dit jouw kerk? →</span>
+                <span className="result-hint">{confirmText}</span>
               </button>
             </li>
           ))}
         </ul>
       )}
       {query.trim().length >= 2 && matches.length === 0 && (
-        <p className="no-results">
-          Geen kerk gevonden voor &ldquo;{query.trim()}&rdquo;. Vraag je
-          beheerder om de directe link.
-        </p>
+        <p className="no-results">{notFoundMsg(query.trim())}</p>
       )}
     </div>
   );

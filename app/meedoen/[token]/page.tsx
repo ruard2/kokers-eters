@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { setRoundParticipation } from "@/app/actions";
 import { displayMonth, parseMonthInput } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ export default async function ParticipationPage({ params, searchParams }: PagePr
   const query = (await searchParams) || {};
   const monthValue = first(query.month) || "";
   const month = parseMonthInput(monthValue);
+  const t = await getTranslations("participation");
+
   const participant = await prisma.participant.findUnique({
     where: { preferenceToken: token }
   });
@@ -39,33 +42,33 @@ export default async function ParticipationPage({ params, searchParams }: PagePr
   return (
     <div className="page narrow">
       <section className="panel centered">
-        <p className="eyebrow">Rondecheck</p>
-        <h1>Doe je mee in {displayMonth(month)}?</h1>
-        <p>Geef aan of je deze ronde meegenomen wilt worden in de automatische koppeling.</p>
+        <p className="eyebrow">{t("eyebrow")}</p>
+        <h1>{t("title", { month: displayMonth(month) })}</h1>
+        <p>{t("intro")}</p>
 
-        {first(query.saved) === "yes" ? <div className="notice success">Je doet mee met deze ronde.</div> : null}
-        {first(query.saved) === "no" ? <div className="notice">Je slaat deze ronde over.</div> : null}
-        {!first(query.saved) && optOut ? <div className="notice">Je staat nu op overslaan voor deze ronde.</div> : null}
+        {first(query.saved) === "yes" ? <div className="notice success">{t("savedYes")}</div> : null}
+        {first(query.saved) === "no" ? <div className="notice">{t("savedNo")}</div> : null}
+        {!first(query.saved) && optOut ? <div className="notice">{t("currentlyOut")}</div> : null}
 
         <div className="button-row">
           <form action={setRoundParticipation}>
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="month" value={monthValue} />
             <input type="hidden" name="choice" value="yes" />
-            <button type="submit">Ja, ik doe mee</button>
+            <button type="submit">{t("buttonYes")}</button>
           </form>
           <form action={setRoundParticipation}>
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="month" value={monthValue} />
             <input type="hidden" name="choice" value="no" />
             <button type="submit" className="secondary">
-              Deze ronde overslaan
+              {t("buttonNo")}
             </button>
           </form>
         </div>
 
         <p>
-          <a href={`/voorkeuren/${token}`}>Voorkeuren aanpassen</a>
+          <a href={`/voorkeuren/${token}`}>{t("preferencesLink")}</a>
         </p>
       </section>
     </div>

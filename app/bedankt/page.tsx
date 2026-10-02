@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -9,19 +11,18 @@ function first(value: string | string[] | undefined) {
 export default async function ThanksPage({ searchParams }: PageProps) {
   const params = (await searchParams) || {};
   const token = first(params.token);
+  const t = await getTranslations("thanks");
 
   return (
     <div className="page narrow">
       <section className="panel centered">
-        <p className="eyebrow">Gelukt</p>
-        <h1>Je aanmelding staat erin.</h1>
-        <p>
-          Je krijgt een mail met je persoonlijke link. Via die link kun je later voorkeuren wijzigen of tijdelijk pauzeren.
-        </p>
+        <p className="eyebrow">{t("eyebrow")}</p>
+        <h1>{t("title")}</h1>
+        <p>{t("body")}</p>
         {token ? (
           <p>
             <a className="button secondary" href={`/voorkeuren/${token}`}>
-              Voorkeuren bekijken
+              {t("viewPreferences")}
             </a>
           </p>
         ) : null}

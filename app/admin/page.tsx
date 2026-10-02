@@ -1,5 +1,6 @@
 import type { EmailLog, MailTemplate, MatchRound, MealMatch, Participant, PlanningSettings } from "@prisma/client";
 import type { ReactNode } from "react";
+import { getTranslations } from "next-intl/server";
 import {
   cancelMatchAction,
   clearDemoAction,
@@ -41,68 +42,20 @@ type MatchWithPeople = MealMatch & {
 
 type StepKey = "participants" | "planning" | "mails" | "summary";
 
-const steps: Array<{ key: StepKey; label: string; helper: string }> = [
-  { key: "participants", label: "Deelnemers toevoegen", helper: "Aanmeldlink, QR en sheet" },
-  { key: "planning", label: "Rondes + matches", helper: "Klaarzetten, schuiven, goedkeuren" },
-  { key: "mails", label: "Mails klaarzetten", helper: "Concepten controleren" },
-  { key: "summary", label: "Samenvatting afronden", helper: "Planning en akkoord" }
-];
-
 function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
 function activeStep(value: string | string[] | undefined): StepKey | "" {
   const step = first(value);
-  if (step === "review") {
-    return "planning";
-  }
-
-  return steps.some((item) => item.key === step) ? (step as StepKey) : "";
+  if (step === "review") return "planning";
+  const keys: StepKey[] = ["participants", "planning", "mails", "summary"];
+  return keys.includes(step as StepKey) ? (step as StepKey) : "";
 }
 
 function adminHref(key: string, params: Record<string, string> = {}) {
-  const query = new URLSearchParams({
-    key,
-    ...params
-  });
+  const query = new URLSearchParams({ key, ...params });
   return `/?${query.toString()}`;
-}
-
-function modeLabel(value: string) {
-  if (value === "EAT") return "Eten";
-  if (value === "HOST") return "Koken";
-  return "Allebei";
-}
-
-function participantKindLabel(isGuest: boolean) {
-  return isGuest ? "Gast" : "Gemeentelid";
-}
-
-function gatheringLabel(value: string) {
-  if (value === "MEAL") return "Maaltijd";
-  if (value === "COFFEE_TEA") return "Koffie/thee";
-  return "Allebei";
-}
-
-function statusLabel(value: string) {
-  const labels: Record<string, string> = {
-    DRAFT: "Concept",
-    HOST_INVITED: "Host gevraagd",
-    HOST_RESPONDED: "Host dagen gekozen",
-    EATER_INVITED: "Eter kiest dag",
-    EATER_CONFIRMED: "Bevestigd",
-    FALLBACK_SENT: "Fallback verstuurd",
-    CANCELLED: "Geannuleerd"
-  };
-
-  return labels[value] || value;
-}
-
-function planningHorizonLabel(value: number) {
-  if (value === 12) return "jaar";
-  if (value === 3) return "kwartaal";
-  return "ronde";
 }
 
 function boardParticipant(participant: Participant) {
@@ -157,16 +110,20 @@ function planningSettingsView(settings: PlanningSettings | null): PlanningSettin
     : defaultPlanningSettings;
 }
 
+type T = Awaited<ReturnType<typeof getTranslations<"admin">>>;
+
 function StepShell({
   children,
   eyebrow,
   title,
-  closeHref
+  closeHref,
+  closeLabel
 }: {
   children: ReactNode;
   eyebrow: string;
   title: string;
   closeHref: string;
+  closeLabel: string;
 }) {
   return (
     <section className="panel step-detail">
@@ -176,7 +133,7 @@ function StepShell({
           <h2>{title}</h2>
         </div>
         <a className="button secondary small" href={closeHref}>
-          Klaar, verberg
+          {closeLabel}
         </a>
       </div>
       {children}
@@ -184,9 +141,16 @@ function StepShell({
   );
 }
 
-function StepBar({ current, adminKey }: { current: StepKey | ""; adminKey: string }) {
+function StepBar({ current, adminKey, t }: { current: StepKey | ""; adminKey: string; t: T }) {
+  const steps: Array<{ key: StepKey; label: string; helper: string }> = [
+    { key: "participants", label: t("steps.participants"), helper: t("steps.participantsHelper") },
+    { key: "planning", label: t("steps.planning"), helper: t("steps.planningHelper") },
+    { key: "mails", label: t("steps.mails"), helper: t("steps.mailsHelper") },
+    { key: "summary", label: t("steps.summary"), helper: t("steps.summaryHelper") }
+  ];
+
   return (
-    <nav aria-label="Admin stappen" className="flow-steps">
+    <nav aria-label={t("navAriaLabel")} className="flow-steps">
       {steps.map((step, index) => (
         <div className="flow-step-wrap" key={step.key}>
           <a className={`flow-step ${current === step.key ? "active" : ""}`} href={adminHref(adminKey, { step: step.key })}>
@@ -203,94 +167,110 @@ function StepBar({ current, adminKey }: { current: StepKey | ""; adminKey: strin
   );
 }
 
-function DemoTools({ adminKey }: { adminKey: string }) {
-  if (!demoSeedEnabled()) {
-    return null;
-  }
+function DemoTools({ adminKey, t }: { adminKey: string; t: T }) {
+  if (!demoSeedEnabled()) return null;
 
   return (
     <div className="panel demo-panel">
       <p className="eyebrow">Demo</p>
       <form action={seedDemoAction}>
         <input type="hidden" name="adminKey" value={adminKey} />
-        <button className="small" type="submit">
-          Demo-data laden
-        </button>
+        <button className="small" type="submit">{t("demoLoadBtn")}</button>
       </form>
       <form action={clearDemoAction}>
         <input type="hidden" name="adminKey" value={adminKey} />
-        <button className="small danger" type="submit">
-          Demo-data wissen
-        </button>
+        <button className="small danger" type="submit">{t("demoClearBtn")}</button>
       </form>
     </div>
   );
 }
 
+function modeLabel(value: string, t: T) {
+  if (value === "EAT") return t("modeEat");
+  if (value === "HOST") return t("modeHost");
+  return t("modeBoth");
+}
+
+function participantKindLabel(isGuest: boolean, t: T) {
+  return isGuest ? t("kindGuest") : t("kindMember");
+}
+
+function gatheringLabel(value: string, t: T) {
+  if (value === "MEAL") return t("gatheringMeal");
+  if (value === "COFFEE_TEA") return t("gatheringCoffee");
+  return t("gatheringBoth");
+}
+
+function statusLabel(value: string, t: T) {
+  const map: Record<string, string> = {
+    DRAFT: "statusDraft",
+    HOST_INVITED: "statusHostInvited",
+    HOST_RESPONDED: "statusHostResponded",
+    EATER_INVITED: "statusEaterInvited",
+    EATER_CONFIRMED: "statusEaterConfirmed",
+    FALLBACK_SENT: "statusFallbackSent",
+    CANCELLED: "statusCancelled"
+  };
+  const key = map[value];
+  return key ? t(key as Parameters<T>[0]) : value;
+}
+
+function planningHorizonLabel(value: number, t: T) {
+  if (value === 12) return t("horizonYear");
+  if (value === 3) return t("horizonQuarter");
+  return t("horizonRound");
+}
+
 function ParticipantSheet({
   adminKey,
   participants,
-  usingDemoData
+  usingDemoData,
+  t
 }: {
   adminKey: string;
   participants: Participant[];
   usingDemoData: boolean;
+  t: T;
 }) {
   return (
     <div className="participant-sheet">
       <div className="participant-sheet-head">
-        <span>#</span>
-        <span>Naam</span>
-        <span>E-mail</span>
-        <span>WhatsApp</span>
-        <span>Wat ben je</span>
-        <span>Rol</span>
-        <span>Komt</span>
-        <span>Ontvangt</span>
-        <span>Niet met</span>
-        <span>Actief</span>
-        <span>Bewaar</span>
-        <span>Verwijder</span>
+        <span>{t("sheetColNum")}</span>
+        <span>{t("sheetColName")}</span>
+        <span>{t("sheetColEmail")}</span>
+        <span>{t("sheetColWhatsapp")}</span>
+        <span>{t("sheetColKind")}</span>
+        <span>{t("sheetColRole")}</span>
+        <span>{t("sheetColComing")}</span>
+        <span>{t("sheetColReceives")}</span>
+        <span>{t("sheetColNoMatch")}</span>
+        <span>{t("sheetColActive")}</span>
+        <span>{t("sheetColSave")}</span>
+        <span>{t("sheetColDelete")}</span>
       </div>
 
       <form action={saveAdminParticipantAction} className="participant-sheet-row new-row">
         <input type="hidden" name="adminKey" value={adminKey} />
-        <span className="sheet-number">Nieuw</span>
-        <input aria-label="Nieuwe naam" disabled={usingDemoData} name="name" placeholder="Gezin / naam" />
-        <input aria-label="Nieuwe e-mail" disabled={usingDemoData} name="email" placeholder="mail@example.nl" />
-        <input aria-label="Nieuw WhatsAppnummer" disabled={usingDemoData} name="whatsapp" placeholder="06..." />
+        <span className="sheet-number">{t("sheetNew")}</span>
+        <input aria-label={t("sheetColName")} disabled={usingDemoData} name="name" placeholder={t("sheetNamePlaceholder")} />
+        <input aria-label={t("sheetColEmail")} disabled={usingDemoData} name="email" placeholder={t("sheetEmailPlaceholder")} />
+        <input aria-label={t("sheetColWhatsapp")} disabled={usingDemoData} name="whatsapp" placeholder={t("sheetWhatsappPlaceholder")} />
         <label className="sheet-check sheet-check-text">
           <input disabled={usingDemoData} name="isGuest" type="checkbox" />
-          <span>Gast</span>
+          <span>{t("sheetGuestLabel")}</span>
         </label>
-        <select aria-label="Nieuwe rol" defaultValue="BOTH" disabled={usingDemoData} name="mode">
-          <option value="BOTH">Allebei</option>
-          <option value="EAT">Eten</option>
-          <option value="HOST">Koken</option>
+        <select aria-label={t("sheetColRole")} defaultValue="BOTH" disabled={usingDemoData} name="mode">
+          <option value="BOTH">{t("sheetModeAll")}</option>
+          <option value="EAT">{t("sheetModeEat")}</option>
+          <option value="HOST">{t("sheetModeHost")}</option>
         </select>
-        <input
-          aria-label="Nieuwe groepgrootte"
-          defaultValue={1}
-          disabled={usingDemoData}
-          min={1}
-          name="comingWithCount"
-          type="number"
-        />
-        <input
-          aria-label="Nieuwe ontvangstcapaciteit"
-          defaultValue={4}
-          disabled={usingDemoData}
-          min={1}
-          name="hostCapacity"
-          type="number"
-        />
-        <input aria-label="Nieuwe niet met" disabled={usingDemoData} name="adminNoMatch" placeholder="#3, naam of e-mail" />
+        <input aria-label={t("sheetColComing")} defaultValue={1} disabled={usingDemoData} min={1} name="comingWithCount" type="number" />
+        <input aria-label={t("sheetColReceives")} defaultValue={4} disabled={usingDemoData} min={1} name="hostCapacity" type="number" />
+        <input aria-label={t("sheetColNoMatch")} disabled={usingDemoData} name="adminNoMatch" placeholder="#3, naam of e-mail" />
         <label className="sheet-check">
           <input defaultChecked disabled={usingDemoData} name="active" type="checkbox" />
         </label>
-        <button className="small" disabled={usingDemoData} type="submit">
-          Voeg toe
-        </button>
+        <button className="small" disabled={usingDemoData} type="submit">{t("sheetAddBtn")}</button>
         <span />
       </form>
 
@@ -299,95 +279,61 @@ function ParticipantSheet({
           <input type="hidden" name="adminKey" value={adminKey} />
           <input type="hidden" name="participantId" value={participant.id} />
           <span className="sheet-number">{index + 1}</span>
-          <input aria-label={`Naam ${participant.name}`} defaultValue={participant.name} disabled={usingDemoData} name="name" />
-          <input
-            aria-label={`E-mail ${participant.name}`}
-            defaultValue={participant.email}
-            disabled={usingDemoData}
-            name="email"
-          />
-          <input
-            aria-label={`WhatsApp ${participant.name}`}
-            defaultValue={participant.whatsapp}
-            disabled={usingDemoData}
-            name="whatsapp"
-          />
+          <input aria-label={`${t("sheetColName")} ${participant.name}`} defaultValue={participant.name} disabled={usingDemoData} name="name" />
+          <input aria-label={`${t("sheetColEmail")} ${participant.name}`} defaultValue={participant.email} disabled={usingDemoData} name="email" />
+          <input aria-label={`${t("sheetColWhatsapp")} ${participant.name}`} defaultValue={participant.whatsapp} disabled={usingDemoData} name="whatsapp" />
           <label className="sheet-check sheet-check-text">
             <input defaultChecked={participant.isGuest} disabled={usingDemoData} name="isGuest" type="checkbox" />
-            <span>Gast</span>
+            <span>{t("sheetGuestLabel")}</span>
           </label>
-          <select aria-label={`Rol ${participant.name}`} defaultValue={participant.mode} disabled={usingDemoData} name="mode">
-            <option value="BOTH">Allebei</option>
-            <option value="EAT">Eten</option>
-            <option value="HOST">Koken</option>
+          <select aria-label={`${t("sheetColRole")} ${participant.name}`} defaultValue={participant.mode} disabled={usingDemoData} name="mode">
+            <option value="BOTH">{t("sheetModeAll")}</option>
+            <option value="EAT">{t("sheetModeEat")}</option>
+            <option value="HOST">{t("sheetModeHost")}</option>
           </select>
-          <input
-            aria-label={`Groepgrootte ${participant.name}`}
-            defaultValue={participant.comingWithCount}
-            disabled={usingDemoData}
-            min={1}
-            name="comingWithCount"
-            type="number"
-          />
-          <input
-            aria-label={`Ontvangstcapaciteit ${participant.name}`}
-            defaultValue={participant.hostCapacity || ""}
-            disabled={usingDemoData}
-            min={1}
-            name="hostCapacity"
-            type="number"
-          />
-          <input
-            aria-label={`Niet met ${participant.name}`}
-            defaultValue={participant.adminNoMatch || ""}
-            disabled={usingDemoData}
-            name="adminNoMatch"
-            placeholder="#3, #8"
-          />
+          <input aria-label={`${t("sheetColComing")} ${participant.name}`} defaultValue={participant.comingWithCount} disabled={usingDemoData} min={1} name="comingWithCount" type="number" />
+          <input aria-label={`${t("sheetColReceives")} ${participant.name}`} defaultValue={participant.hostCapacity || ""} disabled={usingDemoData} min={1} name="hostCapacity" type="number" />
+          <input aria-label={`${t("sheetColNoMatch")} ${participant.name}`} defaultValue={participant.adminNoMatch || ""} disabled={usingDemoData} name="adminNoMatch" placeholder="#3, #8" />
           <label className="sheet-check">
             <input defaultChecked={participant.active} disabled={usingDemoData} name="active" type="checkbox" />
           </label>
-          <button className="small secondary" disabled={usingDemoData} type="submit">
-            Bewaar
-          </button>
+          <button className="small secondary" disabled={usingDemoData} type="submit">{t("sheetSaveBtn")}</button>
           <button
             className="small danger"
             disabled={usingDemoData}
             formAction={deleteParticipantAction}
-            title={`${participant.name} permanent verwijderen (inclusief alle bijbehorende matches)`}
+            title={t("sheetDeleteTitle", { name: participant.name })}
             type="submit"
-          >
-            ✕
-          </button>
+          >✕</button>
         </form>
       ))}
 
-      {participants.length === 0 ? <div className="board-empty">Nog geen deelnemers.</div> : null}
+      {participants.length === 0 ? <div className="board-empty">{t("sheetNoParticipants")}</div> : null}
     </div>
   );
 }
 
-function Worksheet({ matches }: { matches: MatchWithPeople[] }) {
+function Worksheet({ matches, t }: { matches: MatchWithPeople[]; t: T }) {
   return (
     <div className="table-wrap worksheet-wrap">
       <table className="worksheet">
         <thead>
           <tr>
-            <th>#</th>
-            <th>Ronde</th>
-            <th>Status</th>
-            <th>Host</th>
-            <th>Host contact</th>
-            <th>Cap.</th>
-            <th>Eter</th>
-            <th>Eter contact</th>
-            <th>Groep</th>
-            <th>Wat ben je</th>
-            <th>Vorm</th>
-            <th>Allergie/dieet</th>
-            <th>Voorgestelde dagen</th>
-            <th>Definitieve dag</th>
-            <th>Links</th>
+            <th>{t("sheetColNum")}</th>
+            <th>{t("worksheetColRound")}</th>
+            <th>{t("worksheetColStatus")}</th>
+            <th>{t("worksheetColHost")}</th>
+            <th>{t("worksheetColHostContact")}</th>
+            <th>{t("worksheetColCap")}</th>
+            <th>{t("worksheetColEater")}</th>
+            <th>{t("worksheetColEaterContact")}</th>
+            <th>{t("worksheetColGroup")}</th>
+            <th>{t("worksheetColKind")}</th>
+            <th>{t("worksheetColForm")}</th>
+            <th>{t("worksheetColAllergy")}</th>
+            <th>{t("worksheetColProposed")}</th>
+            <th>{t("worksheetColFinal")}</th>
+            <th>{t("worksheetColLinks")}</th>
           </tr>
         </thead>
         <tbody>
@@ -399,30 +345,30 @@ function Worksheet({ matches }: { matches: MatchWithPeople[] }) {
                 <td>{displayMonth(match.round.month)}</td>
                 <td>
                   <span className={`status status-${match.status.toLowerCase().replaceAll("_", "-")}`}>
-                    {statusLabel(match.status)}
+                    {statusLabel(match.status, t)}
                   </span>
                 </td>
                 <td>
                   <strong>{match.host.name}</strong>
-                  <span className="cell-muted">{modeLabel(match.host.mode)}</span>
+                  <span className="cell-muted">{modeLabel(match.host.mode, t)}</span>
                 </td>
                 <td>
                   {match.host.email}
                   <span className="cell-muted">{match.host.whatsapp}</span>
-                  <span className="cell-muted">{match.host.address || "Geen adres"}</span>
+                  <span className="cell-muted">{match.host.address || t("noAddress")}</span>
                 </td>
                 <td>{match.host.hostCapacity || "-"}</td>
                 <td>
                   <strong>{match.eater.name}</strong>
-                  <span className="cell-muted">{modeLabel(match.eater.mode)}</span>
+                  <span className="cell-muted">{modeLabel(match.eater.mode, t)}</span>
                 </td>
                 <td>
                   {match.eater.email}
                   <span className="cell-muted">{match.eater.whatsapp}</span>
                 </td>
                 <td>{match.partySize}</td>
-                <td>{participantKindLabel(match.eater.isGuest)}</td>
-                <td>{gatheringLabel(match.eater.gatheringType)}</td>
+                <td>{participantKindLabel(match.eater.isGuest, t)}</td>
+                <td>{gatheringLabel(match.eater.gatheringType, t)}</td>
                 <td>{match.eater.allergies || "-"}</td>
                 <td>
                   {proposedDates.length > 0
@@ -431,56 +377,16 @@ function Worksheet({ matches }: { matches: MatchWithPeople[] }) {
                 </td>
                 <td>{match.chosenDate ? displayDate(match.chosenDate) : "-"}</td>
                 <td>
-                  <a href={`/koker/${match.hostToken}`}>Host</a>
+                  <a href={`/koker/${match.hostToken}`}>{t("worksheetColHost")}</a>
                   <span className="cell-muted" />
-                  <a href={`/eter/${match.eaterToken}`}>Eter</a>
+                  <a href={`/eter/${match.eaterToken}`}>{t("worksheetColEater")}</a>
                 </td>
               </tr>
             );
           })}
           {matches.length === 0 ? (
             <tr>
-              <td colSpan={15}>Nog geen matches. Genereer eerst een ronde of draai de demo-seed.</td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function RoundsTable({ adminKey, rounds, usingDemoData }: { adminKey: string; rounds: RoundWithMatches[]; usingDemoData: boolean }) {
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Maand</th>
-            <th>Status</th>
-            <th>Matches</th>
-            <th>Actie</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rounds.map((round) => (
-            <tr key={round.id}>
-              <td>{displayMonth(round.month)}</td>
-              <td>{round.status}</td>
-              <td>{round.matches.length}</td>
-              <td>
-                <form action={sendHostInvitesAction}>
-                  <input type="hidden" name="adminKey" value={adminKey} />
-                  <input type="hidden" name="roundId" value={round.id} />
-                  <button className="small" disabled={usingDemoData || round.status !== "DRAFT"} type="submit">
-                    Goedkeuren + mails
-                  </button>
-                </form>
-              </td>
-            </tr>
-          ))}
-          {rounds.length === 0 ? (
-            <tr>
-              <td colSpan={4}>Nog geen rondes.</td>
+              <td colSpan={15}>{t("worksheetNoMatches")}</td>
             </tr>
           ) : null}
         </tbody>
@@ -494,13 +400,15 @@ function RoundsAccordion({
   matches,
   participants,
   rounds,
-  usingDemoData
+  usingDemoData,
+  t
 }: {
   adminKey: string;
   matches: MatchWithPeople[];
   participants: Participant[];
   rounds: RoundWithMatches[];
   usingDemoData: boolean;
+  t: T;
 }) {
   const orderedRounds = [...rounds].sort((a, b) => a.month.getTime() - b.month.getTime());
   const matchesByRound = new Map<string, MatchWithPeople[]>();
@@ -512,7 +420,7 @@ function RoundsAccordion({
   }
 
   if (orderedRounds.length === 0) {
-    return <div className="board-empty">Nog geen rondes. Kies een startmaand en zet een ronde, kwartaal of jaar klaar.</div>;
+    return <div className="board-empty">{t("step2NoRounds")}</div>;
   }
 
   return (
@@ -530,8 +438,8 @@ function RoundsAccordion({
               <span>
                 <strong>{displayMonth(round.month)}</strong>
                 <small>
-                  {statusLabel(round.status)} - {matchCount} verbinding(en)
-                  {draftCount > 0 ? ` - ${draftCount} concept` : ""}
+                  {statusLabel(round.status, t)} - {t("roundConnections", { n: matchCount })}
+                  {draftCount > 0 ? t("roundDraftSuffix", { n: draftCount }) : ""}
                 </small>
               </span>
             </summary>
@@ -540,22 +448,19 @@ function RoundsAccordion({
                 <div className="round-review">
                   <div className="section-header match-review-header">
                     <div>
-                      <h3>Matches aanpassen</h3>
-                      <p>
-                        Sleep een host of eter naar een andere regel om te wisselen. Groen kan, rood kan niet.
-                        Permanente blokkades zet je in de sheet bij <strong>Niet met</strong>.
-                      </p>
+                      <h3>{t("step2MatchesTitle")}</h3>
+                      <p>{t("step2MatchesHint")}</p>
                     </div>
                     <div className="inline-actions">
                       <a className="button secondary" href={adminHref(adminKey, { step: "planning", sheet: "1" })}>
-                        Sheet met aanmeldingen
+                        {t("step2SheetBtn")}
                       </a>
                       {round.status !== "DRAFT" ? (
                         <form action={reopenRoundAction}>
                           <input type="hidden" name="adminKey" value={adminKey} />
                           <input type="hidden" name="roundId" value={round.id} />
                           <button className="secondary" disabled={usingDemoData} type="submit">
-                            Zet terug naar concept
+                            {t("step2BackToDraft")}
                           </button>
                         </form>
                       ) : null}
@@ -570,9 +475,7 @@ function RoundsAccordion({
                     saveChanges={!usingDemoData}
                   />
                 </div>
-              ) : (
-                <p className="compact-muted">Nog geen matchdetails voor deze ronde.</p>
-              )}
+              ) : null}
             </div>
           </details>
         );
@@ -581,60 +484,16 @@ function RoundsAccordion({
   );
 }
 
-function MatchesTable({ adminKey, matches, usingDemoData }: { adminKey: string; matches: MatchWithPeople[]; usingDemoData: boolean }) {
+function EmailLogsTable({ emailLogs, t }: { emailLogs: EmailLog[]; t: T }) {
   return (
     <div className="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Ronde</th>
-            <th>Host</th>
-            <th>Eter</th>
-            <th>Groep</th>
-            <th>Status</th>
-            <th>Actie</th>
-          </tr>
-        </thead>
-        <tbody>
-          {matches.map((match) => (
-            <tr key={match.id}>
-              <td>{displayMonth(match.round.month)}</td>
-              <td>{match.host.name}</td>
-              <td>{match.eater.name}</td>
-              <td>{match.partySize}</td>
-              <td>{statusLabel(match.status)}</td>
-              <td>
-                <form action={cancelMatchAction}>
-                  <input type="hidden" name="adminKey" value={adminKey} />
-                  <input type="hidden" name="matchId" value={match.id} />
-                  <button className="small danger" disabled={usingDemoData || match.status === "CANCELLED"} type="submit">
-                    Annuleer
-                  </button>
-                </form>
-              </td>
-            </tr>
-          ))}
-          {matches.length === 0 ? (
-            <tr>
-              <td colSpan={6}>Nog geen matches.</td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function EmailLogsTable({ emailLogs }: { emailLogs: EmailLog[] }) {
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Type</th>
-            <th>Naar</th>
-            <th>Status</th>
-            <th>Onderwerp</th>
+            <th>{t("logsColType")}</th>
+            <th>{t("logsColEmail")}</th>
+            <th>{t("logsColStatus")}</th>
+            <th>{t("logsColSubject")}</th>
           </tr>
         </thead>
         <tbody>
@@ -648,7 +507,7 @@ function EmailLogsTable({ emailLogs }: { emailLogs: EmailLog[] }) {
           ))}
           {emailLogs.length === 0 ? (
             <tr>
-              <td colSpan={4}>Nog geen mails.</td>
+              <td colSpan={4}>{t("noMails")}</td>
             </tr>
           ) : null}
         </tbody>
@@ -657,53 +516,51 @@ function EmailLogsTable({ emailLogs }: { emailLogs: EmailLog[] }) {
   );
 }
 
-
 function StepOne({
   adminKey,
   participants,
   showSheet,
   signupUrl,
-  usingDemoData
+  usingDemoData,
+  t
 }: {
   adminKey: string;
   participants: Participant[];
   showSheet: boolean;
   signupUrl: string;
   usingDemoData: boolean;
+  t: T;
 }) {
   return (
-    <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 1" title="Deelnemers toevoegen">
+    <StepShell closeHref={adminHref(adminKey)} eyebrow={t("step1Eyebrow")} title={t("step1Title")} closeLabel={t("stepClose")}>
       <div className="step-grid">
         <div className="qr-card">
-          <img alt="QR-code naar de aanmeldpagina" src={`/api/qr?text=${encodeURIComponent(signupUrl)}`} />
+          <img alt="QR" src={`/api/qr?text=${encodeURIComponent(signupUrl)}`} />
           <div>
-            <strong>Aanmeldpagina</strong>
-            <p className="compact-muted">Deel deze link of QR-code met deelnemers. Beide gaan naar hetzelfde aanmeldformulier.</p>
+            <strong>{t("step1SignupTitle")}</strong>
+            <p className="compact-muted">{t("step1SignupHint")}</p>
             <input readOnly value={signupUrl} />
             <div className="inline-actions">
               <CopyButton value={signupUrl} />
               <CopyQrButton value={signupUrl} />
-              <a className="button secondary" href="/aanmelden">
-                Open pagina
-              </a>
+              <a className="button secondary" href="/aanmelden">{t("step1OpenPage")}</a>
             </div>
           </div>
         </div>
         <div className="step-card-flat">
-          <strong>{participants.length} aanmeldingen</strong>
+          <strong>{t("step1SignupCount", { n: participants.length })}</strong>
           <p>
-            Deelnemers kunnen zelf aanmelden en voorkeuren wijzigen. Als admin kun je dezelfde lijst ook handmatig
-            corrigeren of gezinnen toevoegen.
+            Deelnemers kunnen zelf aanmelden en voorkeuren wijzigen. Als admin kun je dezelfde lijst ook handmatig corrigeren of gezinnen toevoegen.
           </p>
           <a className="button" href={adminHref(adminKey, { step: "participants", sheet: "1" })}>
-            Zie aanmeldingen / voeg toe
+            {t("step1SignupBtn")}
           </a>
         </div>
       </div>
 
       {showSheet ? (
         <div className="nested-panel">
-          <ParticipantSheet adminKey={adminKey} participants={participants} usingDemoData={usingDemoData} />
+          <ParticipantSheet adminKey={adminKey} participants={participants} usingDemoData={usingDemoData} t={t} />
         </div>
       ) : null}
     </StepShell>
@@ -718,7 +575,8 @@ function StepTwo({
   planningSettings,
   rounds,
   showSheet,
-  usingDemoData
+  usingDemoData,
+  t
 }: {
   adminKey: string;
   defaultMonth: string;
@@ -728,9 +586,10 @@ function StepTwo({
   rounds: RoundWithMatches[];
   showSheet: boolean;
   usingDemoData: boolean;
+  t: T;
 }) {
   return (
-    <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 2" title="Rondes en matches klaarzetten">
+    <StepShell closeHref={adminHref(adminKey)} eyebrow={t("step2Eyebrow")} title={t("step2Title")} closeLabel={t("stepClose")}>
       <form action={generatePlanningAction} className="planning-form" key={`planning-${planningSettings.horizonMonths}-${defaultMonth}`}>
         <input type="hidden" name="adminKey" value={adminKey} />
         <input type="hidden" name="adminCheckDaysBefore" value={planningSettings.adminCheckDaysBefore} />
@@ -739,46 +598,35 @@ function StepTwo({
         <input type="hidden" name="reminderDaysAfter" value={planningSettings.reminderDaysAfter} />
         <input type="hidden" name="renewalCadence" value={planningSettings.renewalCadence} />
         <label>
-          Startmaand
+          {t("step2StartMonth")}
           <input name="startMonth" type="month" defaultValue={defaultMonth} />
-          <span className="field-hint">De eerste maand waarvoor je conceptmatches wilt maken.</span>
+          <span className="field-hint">{t("step2StartMonthHint")}</span>
         </label>
         <label>
-          Voor hoelang klaarzetten
+          {t("step2HorizonLabel")}
           <select defaultValue={String(planningSettings.horizonMonths)} name="horizonMonths">
-            <option value="1">Een ronde</option>
-            <option value="3">Kwartaal</option>
-            <option value="12">Jaar</option>
+            <option value="1">{t("step2HorizonRound")}</option>
+            <option value="3">{t("step2HorizonQuarter")}</option>
+            <option value="12">{t("step2HorizonYear")}</option>
           </select>
-          <span className="field-hint">Een ronde is een maand. Een jaar maakt twaalf maandrondes in een keer.</span>
+          <span className="field-hint">{t("step2HorizonHint")}</span>
         </label>
-        <button disabled={usingDemoData} type="submit">
-          Rondes klaarzetten
-        </button>
+        <button disabled={usingDemoData} type="submit">{t("step2GenerateBtn")}</button>
       </form>
 
-      <p className="step-help">
-        Matches worden automatisch gegenereerd met de deelnemers zoals ze nu in de sheet staan. Klik een maand open om de
-        verbindingen te controleren, handmatig te schuiven en goed te keuren.
-      </p>
+      <p className="step-help">{t("step2Help")}</p>
 
       <div className="nested-panel">
         <div className="section-header">
-          <h2>Rondes in de planning</h2>
-          <span className="section-hint">Klik een maand open voor matches, sheet en goedkeuring.</span>
+          <h2>{t("step2RoundsTitle")}</h2>
+          <span className="section-hint">{t("step2RoundsHint")}</span>
         </div>
-        <RoundsAccordion
-          adminKey={adminKey}
-          matches={matches}
-          participants={participants}
-          rounds={rounds}
-          usingDemoData={usingDemoData}
-        />
+        <RoundsAccordion adminKey={adminKey} matches={matches} participants={participants} rounds={rounds} usingDemoData={usingDemoData} t={t} />
       </div>
 
       {showSheet ? (
         <div className="nested-panel">
-          <ParticipantSheet adminKey={adminKey} participants={participants} usingDemoData={usingDemoData} />
+          <ParticipantSheet adminKey={adminKey} participants={participants} usingDemoData={usingDemoData} t={t} />
         </div>
       ) : null}
     </StepShell>
@@ -789,23 +637,22 @@ function StepFour({
   adminKey,
   emailLogs,
   mailTemplates,
-  usingDemoData
+  usingDemoData,
+  t
 }: {
   adminKey: string;
   emailLogs: EmailLog[];
   mailTemplates: MailTemplate[];
   usingDemoData: boolean;
+  t: T;
 }) {
   const savedTemplates = new Map(mailTemplates.map((template) => [template.type, template]));
 
   return (
-    <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 3" title="Mails klaarzetten">
+    <StepShell closeHref={adminHref(adminKey)} eyebrow={t("step3Eyebrow")} title={t("step3Title")} closeLabel={t("stepClose")}>
       <div className="mail-cycle-note">
-        <strong>Hier stel je in welke mails het systeem verstuurt en wat erin staat.</strong>
-        <span>
-          Per match vult het systeem de juiste persoonlijke URL in. Zet een mail uit als je die stap niet wilt gebruiken.
-          Versturen doe je in stap 4.
-        </span>
+        <strong>{t("step3NoteTitle")}</strong>
+        <span>{t("step3NoteBody")}</span>
       </div>
       <div className="mail-template-list">
         {adminMailTemplateDefinitions.map((definition) => {
@@ -816,7 +663,9 @@ function StepFour({
               <summary>
                 <strong>
                   {definition.label}
-                  <span className={`template-status ${enabled ? "on" : "off"}`}>{enabled ? "Aan" : "Uit"}</span>
+                  <span className={`template-status ${enabled ? "on" : "off"}`}>
+                    {enabled ? t("step3TemplateOn") : t("step3TemplateOff")}
+                  </span>
                 </strong>
                 <span>{definition.description}</span>
               </summary>
@@ -825,19 +674,17 @@ function StepFour({
                 <input type="hidden" name="type" value={definition.type} />
                 <label className="check-row template-enabled">
                   <input defaultChecked={enabled} disabled={usingDemoData} name="enabled" type="checkbox" />
-                  Deze mail versturen
+                  {t("step3EnableLabel")}
                 </label>
                 <label>
-                  Onderwerp
+                  {t("step3SubjectLabel")}
                   <input defaultValue={saved?.subject || definition.subject} disabled={usingDemoData} name="subject" />
                 </label>
                 <label>
-                  Tekst
+                  {t("step3BodyLabel")}
                   <textarea defaultValue={saved?.body || definition.body} disabled={usingDemoData} name="body" />
                 </label>
-                <button className="small" disabled={usingDemoData} type="submit">
-                  Bewaar concept
-                </button>
+                <button className="small" disabled={usingDemoData} type="submit">{t("step3SaveBtn")}</button>
               </form>
             </details>
           );
@@ -846,9 +693,9 @@ function StepFour({
 
       <div className="nested-panel">
         <div className="section-header">
-          <h2>Laatste mails</h2>
+          <h2>{t("step3LogsTitle")}</h2>
         </div>
-        <EmailLogsTable emailLogs={emailLogs} />
+        <EmailLogsTable emailLogs={emailLogs} t={t} />
       </div>
     </StepShell>
   );
@@ -862,7 +709,8 @@ function StepFive({
   participants,
   planningSettings,
   rounds,
-  usingDemoData
+  usingDemoData,
+  t
 }: {
   adminKey: string;
   defaultMonth: string;
@@ -872,105 +720,85 @@ function StepFive({
   planningSettings: PlanningSettingsView;
   rounds: RoundWithMatches[];
   usingDemoData: boolean;
+  t: T;
 }) {
-  const activeParticipants = participants.filter((participant) => participant.active);
-  const hostCount = activeParticipants.filter((participant) => participant.mode !== "EAT").length;
-  const eaterCount = activeParticipants.filter((participant) => participant.mode !== "HOST").length;
-  const guestCount = activeParticipants.filter((participant) => participant.isGuest).length;
+  const activeParticipants = participants.filter((p) => p.active);
+  const hostCount = activeParticipants.filter((p) => p.mode !== "EAT").length;
+  const eaterCount = activeParticipants.filter((p) => p.mode !== "HOST").length;
+  const guestCount = activeParticipants.filter((p) => p.isGuest).length;
   const memberCount = activeParticipants.length - guestCount;
-  const savedPlanningLabel = planningHorizonLabel(planningSettings.horizonMonths);
-  const totalDraftMatches = matches.filter((match) => match.status === "DRAFT").length;
+  const savedPlanningLabel = planningHorizonLabel(planningSettings.horizonMonths, t);
+  const totalDraftMatches = matches.filter((m) => m.status === "DRAFT").length;
 
   return (
-    <StepShell closeHref={adminHref(adminKey)} eyebrow="Stap 4" title="Samenvatting en afronden">
+    <StepShell closeHref={adminHref(adminKey)} eyebrow={t("step4Eyebrow")} title={t("step4Title")} closeLabel={t("stepClose")}>
       <div className="summary-cards">
         <div>
-          <span>Stap 1</span>
-          <strong>{activeParticipants.length} actieve deelnemers</strong>
-          <small>
-            {hostCount} kunnen ontvangen, {eaterCount} kunnen eten. {memberCount} gemeentelid, {guestCount} gast.
-          </small>
+          <span>{t("step4S1")}</span>
+          <strong>{t("step4ActiveParticipants", { n: activeParticipants.length })}</strong>
+          <small>{t("step4ParticipantDetail", { hosts: hostCount, eaters: eaterCount, members: memberCount, guests: guestCount })}</small>
         </div>
         <div>
-          <span>Stap 2</span>
-          <strong>{rounds.length} ronde(s)</strong>
-          <small>
-            Planning staat op {savedPlanningLabel}; {totalDraftMatches} conceptmatch(es) wachten op goedkeuring.
-          </small>
+          <span>{t("step4S2")}</span>
+          <strong>{t("step4Rounds", { n: rounds.length })}</strong>
+          <small>{t("step4RoundsDetail", { horizon: savedPlanningLabel, drafts: totalDraftMatches })}</small>
         </div>
         <div>
-          <span>Stap 3</span>
-          <strong>{adminMailTemplateDefinitions.length} cyclusmails</strong>
-          <small>{emailLogs.length} laatste mail-logregels zichtbaar.</small>
+          <span>{t("step4S3")}</span>
+          <strong>{t("step4Mails", { n: adminMailTemplateDefinitions.length })}</strong>
+          <small>{t("step4MailsDetail", { n: emailLogs.length })}</small>
         </div>
         <div>
-          <span>Stap 4</span>
-          <strong>{matches.length} matches totaal</strong>
-          <small>
-            {totalDraftMatches > 0
-              ? `${totalDraftMatches} conceptmatch(es) wachten op goedkeuring.`
-              : "Alle matches zijn al goedgekeurd of verstuurd."}
-          </small>
+          <span>{t("step4S4")}</span>
+          <strong>{t("step4TotalMatches", { n: matches.length })}</strong>
+          <small>{totalDraftMatches > 0 ? t("step4DraftsPending", { n: totalDraftMatches }) : t("step4AllApproved")}</small>
         </div>
       </div>
 
       <div className="approval-panel">
         <div>
-          <strong>Meedoen-check versturen</strong>
-          <p>
-            Vraag deelnemers of ze meewillen in de komende maand. Optioneel — sla over als je dit handmatig of via de
-            automatische cron afhandelt.
-          </p>
+          <strong>{t("step4CheckTitle")}</strong>
+          <p>{t("step4CheckBody")}</p>
         </div>
         <form action={sendPreferenceChecksAction} className="inline-form">
           <input type="hidden" name="adminKey" value={adminKey} />
           <label>
-            Maand
+            {t("step4CheckMonth")}
             <input name="month" type="month" defaultValue={defaultMonth} />
           </label>
           <button className="secondary" disabled={usingDemoData} type="submit">
-            Stuur meedoen-checks
+            {t("step4CheckBtn")}
           </button>
         </form>
       </div>
 
       <div className="approval-panel">
         <div>
-          <strong>Akkoord met deze planning?</strong>
-          <p>
-            Na goedkeuring krijgen alle kokers van concept-rondes hun mail. Als deelnemers tussentijds wijzigen, pas je
-            de sheet aan en loop je stap 2 opnieuw langs.
-          </p>
+          <strong>{t("step4ApproveTitle")}</strong>
+          <p>{t("step4ApproveBody")}</p>
         </div>
         <form action={sendHostInvitesAction}>
           <input type="hidden" name="adminKey" value={adminKey} />
-          {/* Geen roundId = verstuurt naar alle concept-rondes in één keer */}
           <button disabled={usingDemoData || totalDraftMatches === 0} type="submit">
             {totalDraftMatches > 0
-              ? `Geef akkoord — stuur ${totalDraftMatches} host-mail${totalDraftMatches !== 1 ? "s" : ""}`
-              : "Geen concept-matches om te versturen"}
+              ? t("step4ApproveBtn", { n: totalDraftMatches, suffix: totalDraftMatches !== 1 ? "s" : "" })
+              : t("step4NoMatches")}
           </button>
         </form>
       </div>
 
       <div className="nested-panel">
         <div className="section-header">
-          <h2>Gehele planning</h2>
+          <h2>{t("step4PlanTitle")}</h2>
         </div>
-        <RoundsAccordion
-          adminKey={adminKey}
-          matches={matches}
-          participants={participants}
-          rounds={rounds}
-          usingDemoData={usingDemoData}
-        />
+        <RoundsAccordion adminKey={adminKey} matches={matches} participants={participants} rounds={rounds} usingDemoData={usingDemoData} t={t} />
       </div>
 
       <div className="nested-panel worksheet-panel">
         <div className="section-header">
-          <h2>Werkblad matches</h2>
+          <h2>{t("step4WorksheetTitle")}</h2>
         </div>
-        <Worksheet matches={matches} />
+        <Worksheet matches={matches} t={t} />
       </div>
     </StepShell>
   );
@@ -980,36 +808,29 @@ function EmptyDashboard({
   adminKey,
   matches,
   participants,
-  rounds
+  rounds,
+  t
 }: {
   adminKey: string;
   matches: MatchWithPeople[];
   participants: Participant[];
   rounds: RoundWithMatches[];
+  t: T;
 }) {
   return (
     <section className="panel step-empty">
       <div>
         <p className="eyebrow">Overzicht</p>
-        <h2>Kies boven een stap</h2>
-        <p>Alles zit nog in dezelfde admin, maar zware tabellen en boards staan pas open als je ze nodig hebt.</p>
+        <h2>{t("emptyTitle")}</h2>
+        <p>{t("emptyBody")}</p>
       </div>
       <div className="quick-stats">
-        <span>
-          <strong>{participants.length}</strong>
-          Deelnemers
-        </span>
-        <span>
-          <strong>{rounds.length}</strong>
-          Rondes
-        </span>
-        <span>
-          <strong>{matches.length}</strong>
-          Matches
-        </span>
+        <span><strong>{participants.length}</strong>{t("emptyParticipants")}</span>
+        <span><strong>{rounds.length}</strong>{t("emptyRounds")}</span>
+        <span><strong>{matches.length}</strong>{t("emptyMatches")}</span>
       </div>
       <a className="button" href={adminHref(adminKey, { step: "participants" })}>
-        Begin bij stap 1
+        {t("emptyStartBtn")}
       </a>
     </section>
   );
@@ -1021,33 +842,33 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const notice = first(query.notice);
   const currentStep = activeStep(query.step);
   const showSheet = first(query.sheet) === "1";
+  const t = await getTranslations("admin");
 
   const adminContext = resolveAdminContext(key);
   if (!adminContext) {
     return (
       <div className="page narrow">
         <section className="panel centered">
-          <p className="eyebrow">Admin</p>
-          <h1>Admin openen</h1>
+          <p className="eyebrow">{t("loginEyebrow")}</p>
+          <h1>{t("loginTitle")}</h1>
           <form className="stack" action="/">
             <label>
-              Admin-sleutel
+              {t("loginKeyLabel")}
               <input name="key" type="password" />
             </label>
-            <button type="submit">Openen</button>
+            <button type="submit">{t("loginButton")}</button>
           </form>
           <div style={{ marginTop: "1.5rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border, #e0e7e2)" }}>
             <p style={{ margin: "0 0 0.75rem", color: "var(--color-muted, #5e6b62)", fontSize: "0.875rem" }}>
-              Wil je eerst zien hoe het werkt?
+              {t("demoPrompt")}
             </p>
-            <a className="button secondary" href="/?key=demo">
-              Bekijk demo
-            </a>
+            <a className="button secondary" href="/?key=demo">{t("demoButton")}</a>
           </div>
         </section>
       </div>
     );
   }
+
   const organizationId = adminContext.organizationId;
   const isDemoMode = adminContext.isDemoMode === true;
 
@@ -1066,53 +887,19 @@ export default async function AdminPage({ searchParams }: PageProps) {
     matches = demo.matches as unknown as MatchWithPeople[];
     emailLogs = demo.emailLogs as unknown as EmailLog[];
   } else try {
-    const [
-      participantRows,
-      roundRows,
-      matchRows,
-      emailLogRows,
-      settingsRow,
-      templateRows
-    ] = await Promise.all([
-      prisma.participant.findMany({
-        where: { organizationId },
-        orderBy: { createdAt: "asc" },
-        take: 120
-      }),
-      prisma.matchRound.findMany({
-        where: { organizationId },
-        orderBy: { month: "asc" },
-        take: 36,
-        include: { matches: true }
-      }),
-      prisma.mealMatch.findMany({
-        where: { round: { organizationId } },
-        orderBy: { createdAt: "desc" },
-        take: 120,
-        include: { host: true, eater: true, round: true }
-      }),
+    const [participantRows, roundRows, matchRows, emailLogRows, settingsRow, templateRows] = await Promise.all([
+      prisma.participant.findMany({ where: { organizationId }, orderBy: { createdAt: "asc" }, take: 120 }),
+      prisma.matchRound.findMany({ where: { organizationId }, orderBy: { month: "asc" }, take: 36, include: { matches: true } }),
+      prisma.mealMatch.findMany({ where: { round: { organizationId } }, orderBy: { createdAt: "desc" }, take: 120, include: { host: true, eater: true, round: true } }),
       prisma.emailLog.findMany({
         where: organizationId
-          ? {
-              OR: [
-                { participant: { organizationId } },
-                { match: { round: { organizationId } } }
-              ]
-            }
-          : {
-              OR: [
-                { participant: { organizationId: null } },
-                { match: { round: { organizationId: null } } }
-              ]
-            },
+          ? { OR: [{ participant: { organizationId } }, { match: { round: { organizationId } } }] }
+          : { OR: [{ participant: { organizationId: null } }, { match: { round: { organizationId: null } } }] },
         orderBy: { createdAt: "desc" },
         take: 30
       }),
       prisma.planningSettings.findFirst({ where: { organizationId } }),
-      prisma.mailTemplate.findMany({
-        where: { organizationId },
-        orderBy: { type: "asc" }
-      })
+      prisma.mailTemplate.findMany({ where: { organizationId }, orderBy: { type: "asc" } })
     ]);
     participants = participantRows;
     rounds = roundRows;
@@ -1127,7 +914,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
     rounds = demo.rounds as unknown as RoundWithMatches[];
     matches = demo.matches as unknown as MatchWithPeople[];
     emailLogs = demo.emailLogs as unknown as EmailLog[];
-  } // end else try
+  }
 
   const signupUrl = organizationId
     ? appUrl(`/aanmelden?organization=${encodeURIComponent(organizationId)}`)
@@ -1143,69 +930,37 @@ export default async function AdminPage({ searchParams }: PageProps) {
     <div className="page wide-page">
       <section className="intro compact admin-topline">
         <div>
-          <p className="eyebrow">Admin</p>
-          <h1>Eters & Kokers planning</h1>
-          <p>Doorloop de stappen. Klik een stap open, werk hem af, en verberg hem weer als je klaar bent.</p>
+          <p className="eyebrow">{t("mainEyebrow")}</p>
+          <h1>{t("mainTitle")}</h1>
+          <p>{t("mainIntro")}</p>
         </div>
-        <DemoTools adminKey={key} />
+        <DemoTools adminKey={key} t={t} />
       </section>
 
       {notice ? <div className="notice success">{notice}</div> : null}
       {isDemoMode ? (
         <div className="notice">
-          <strong>Demo-modus.</strong> Je bekijkt een voorbeeld met nep-data. Alle knoppen zijn uitgeschakeld.{" "}
-          <a href="/">Terug naar inloggen</a>
+          <strong>{t("demoBannerTitle")}</strong> {t("demoBannerBody")}{" "}
+          <a href="/">{t("demoBannerBack")}</a>
         </div>
       ) : usingDemoData ? (
-        <div className="notice">
-          Demo-data zichtbaar omdat de lokale database niet bereikbaar is. Start Postgres en draai de seed om echte
-          database-data te tonen.
-        </div>
+        <div className="notice">{t("demoDbNotice")}</div>
       ) : null}
 
-      <StepBar adminKey={key} current={currentStep} />
+      <StepBar adminKey={key} current={currentStep} t={t} />
 
-      {!currentStep ? <EmptyDashboard adminKey={key} matches={matches} participants={participants} rounds={rounds} /> : null}
+      {!currentStep ? <EmptyDashboard adminKey={key} matches={matches} participants={participants} rounds={rounds} t={t} /> : null}
       {currentStep === "participants" ? (
-        <StepOne
-          adminKey={key}
-          participants={participants}
-          showSheet={showSheet}
-          signupUrl={signupUrl}
-          usingDemoData={usingDemoData}
-        />
+        <StepOne adminKey={key} participants={participants} showSheet={showSheet} signupUrl={signupUrl} usingDemoData={usingDemoData} t={t} />
       ) : null}
       {currentStep === "planning" ? (
-        <StepTwo
-          adminKey={key}
-          defaultMonth={defaultMonth}
-          matches={matches}
-          participants={participants}
-          planningSettings={planningSettings}
-          rounds={planningRounds}
-          showSheet={showSheet}
-          usingDemoData={usingDemoData}
-        />
+        <StepTwo adminKey={key} defaultMonth={defaultMonth} matches={matches} participants={participants} planningSettings={planningSettings} rounds={planningRounds} showSheet={showSheet} usingDemoData={usingDemoData} t={t} />
       ) : null}
       {currentStep === "mails" ? (
-        <StepFour
-          adminKey={key}
-          emailLogs={emailLogs}
-          mailTemplates={mailTemplates}
-          usingDemoData={usingDemoData}
-        />
+        <StepFour adminKey={key} emailLogs={emailLogs} mailTemplates={mailTemplates} usingDemoData={usingDemoData} t={t} />
       ) : null}
       {currentStep === "summary" ? (
-        <StepFive
-          adminKey={key}
-          defaultMonth={defaultMonth}
-          emailLogs={emailLogs}
-          matches={matches}
-          participants={participants}
-          planningSettings={planningSettings}
-          rounds={rounds}
-          usingDemoData={usingDemoData}
-        />
+        <StepFive adminKey={key} defaultMonth={defaultMonth} emailLogs={emailLogs} matches={matches} participants={participants} planningSettings={planningSettings} rounds={rounds} usingDemoData={usingDemoData} t={t} />
       ) : null}
     </div>
   );
