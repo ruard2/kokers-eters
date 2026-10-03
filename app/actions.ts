@@ -158,7 +158,11 @@ export async function registerParticipant(formData: FormData) {
         }
       });
 
-  await sendWelcomeEmail(participant);
+  try {
+    await sendWelcomeEmail(participant);
+  } catch (err) {
+    console.error("Welcome email failed (continuing):", err);
+  }
   redirect(`/bedankt?token=${participant.preferenceToken}`);
 }
 
@@ -215,7 +219,11 @@ export async function submitHostDates(formData: FormData) {
     include: matchInclude
   });
 
-  await sendEaterChoiceEmail(updated);
+  try {
+    await sendEaterChoiceEmail(updated);
+  } catch (err) {
+    console.error("Eater choice email failed (continuing):", err);
+  }
   redirect(`/koker/${token}?sent=1`);
 }
 
@@ -246,7 +254,11 @@ export async function submitEaterChoice(formData: FormData) {
     include: matchInclude
   });
 
-  await sendConfirmationEmails(updated);
+  try {
+    await sendConfirmationEmails(updated);
+  } catch (err) {
+    console.error("Confirmation emails failed (continuing):", err);
+  }
   redirect(`/eter/${token}?confirmed=1`);
 }
 
