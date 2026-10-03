@@ -68,7 +68,7 @@
   },
   "home": {
     "title": "Eters & Kokke",
-    "intro": "\'n App wat maaltye reël binne kerkgemeenskappe. Soek jou kerk hieronder om aan te meld.",
+    "intro": "'n App wat maaltye reël binne kerkgemeenskappe. Soek jou kerk hieronder om aan te meld.",
     "adminLink": "Bestuurder? Meld hier aan"
   },
   "search": {
@@ -77,7 +77,7 @@
     "confirm": "Is dit jou kerk? →",
     "foundEyebrow": "Gevind",
     "signupButton": "Meld aan by {name}",
-    "otherChurch": "Soek \'n ander kerk",
+    "otherChurch": "Soek 'n ander kerk",
     "notFound": "Geen kerk gevind vir \"{query}\". Vra jou bestuurder vir die direkte skakel."
   },
   "signup": {
@@ -85,7 +85,7 @@
     "title": "Skuif aan of stel jou tafel oop.",
     "intro": "Vul kortliks in hoe jy wil deelneem. Die app koppel mense per ronde outomaties en stuur daarna die regte e-posse.",
     "errorRequired": "Vul ten minste naam, e-posadres en WhatsApp-nommer in.",
-    "errorAddress": "Vul \'n adres in as jy eters ontvang.",
+    "errorAddress": "Vul 'n adres in as jy eters ontvang.",
     "submit": "Aanmeld"
   },
   "form": {
@@ -98,9 +98,9 @@
     "name": "Naam",
     "email": "E-posadres",
     "whatsapp": "WhatsApp-nommer",
-    "isGuest": "Ek is \'n gas (nie \'n gemeentelid nie)",
-    "guestTooltipTitle": "Wat is \'n gas?",
-    "guestTooltipBody": "\'n Gas is iemand van buite die gemeente — \'n vriend, familielid of kennis wat jy wil saambring of ontvang. Die program hou by wie gemeentelid is en wie gas, sodat bewustelik gekies kan word by wie gaste tereggaan.",
+    "isGuest": "Ek is 'n gas (nie 'n gemeentelid nie)",
+    "guestTooltipTitle": "Wat is 'n gas?",
+    "guestTooltipBody": "'n Gas is iemand van buite die gemeente — 'n vriend, familielid of kennis wat jy wil saambring of ontvang. Die program hou by wie gemeentelid is en wie gas, sodat bewustelik gekies kan word by wie gaste tereggaan.",
     "guestTooltipDismiss": "Verstaan",
     "eatSection": "As jy kom eet",
     "comingWithCount": "Met hoeveel persone kom jy?",
@@ -120,7 +120,7 @@
     "doneSent": "Gestuur!",
     "coupledTo": "Vir {month} is jy gekoppel aan {name}.",
     "finalDate": "Finale datum: {date}.",
-    "eaterWillChoose": "Die eter ontvang \'n e-pos met jou beskikbare dae en kan nou \'n dag kies.",
+    "eaterWillChoose": "Die eter ontvang 'n e-pos met jou beskikbare dae en kan nou 'n dag kies.",
     "pickTitle": "Kies dae",
     "errorNoDates": "Kies ten minste een dag.",
     "labelGroup": "Groep",
@@ -136,7 +136,7 @@
     "doneTitle": "Bevestig!",
     "coupledTo": "Vir {month} is jy gekoppel aan {name}.",
     "finalDate": "Finale datum: {date}.",
-    "confirmationMail": "Julle kry albei \'n bevestigings-e-pos.",
+    "confirmationMail": "Julle kry albei 'n bevestigings-e-pos.",
     "pickTitle": "Kies jou dag",
     "errorNoDate": "Kies een van die voorgestelde dae.",
     "labelAddress": "Adres",
@@ -144,7 +144,7 @@
     "labelNote": "Opmerking van gasheer",
     "noNote": "Geen opmerking",
     "submitChoice": "Bevestig hierdie dag",
-    "noDatesYet": "Die gasheer het nog nie dae gekies nie. Jy ontvang \'n e-pos sodra dit gedoen is."
+    "noDatesYet": "Die gasheer het nog nie dae gekies nie. Jy ontvang 'n e-pos sodra dit gedoen is."
   },
   "participation": {
     "eyebrow": "Rondekontrole",
@@ -168,7 +168,7 @@
   "thanks": {
     "eyebrow": "Klaar",
     "title": "Jou aanmelding is geslaag.",
-    "body": "Jy sal \'n e-pos ontvang met jou persoonlike skakel. Via die skakel kan jy later voorkeure wysig of tydelik pouseer.",
+    "body": "Jy sal 'n e-pos ontvang met jou persoonlike skakel. Via die skakel kan jy later voorkeure wysig of tydelik pouseer.",
     "viewPreferences": "Sien voorkeure"
   },
   "admin": {
@@ -179,14 +179,14 @@
     "demoPrompt": "Wil jy eers sien hoe dit werk?",
     "demoButton": "Sien demo",
     "demoBannerTitle": "Demo-modus.",
-    "demoBannerBody": "Jy sien \'n voorbeeld met nep-data. Alle knoppies is gedeaktiveer.",
+    "demoBannerBody": "Jy sien 'n voorbeeld met nep-data. Alle knoppies is gedeaktiveer.",
     "demoBannerBack": "Terug na aanmelding",
     "demoDbNotice": "Demo-data sigbaar omdat die plaaslike databasis nie bereikbaar is nie. Begin Postgres en voer die saad uit om regte data te sien.",
     "demoLoadBtn": "Laai demo-data",
     "demoClearBtn": "Vee demo-data uit",
     "mainEyebrow": "Admin",
     "mainTitle": "Eters & Kokke beplanning",
-    "mainIntro": "Werk deur die stappe. Klik \'n stap oop, werk dit af, en verberg dit weer as jy klaar is.",
+    "mainIntro": "Werk deur die stappe. Klik 'n stap oop, werk dit af, en verberg dit weer as jy klaar is.",
     "stepClose": "Klaar, verberg",
     "steps": {
       "participants": "Deelnemers byvoeg",
@@ -198,7 +198,7 @@
       "summary": "Opsomming afrond",
       "summaryHelper": "Beplanning en goedkeuring"
     },
-    "emptyTitle": "Kies \'n stap hierbo",
+    "emptyTitle": "Kies 'n stap hierbo",
     "emptyBody": "Alles is in dieselfde admin, maar swaar tabelle en borde laai eers as jy dit nodig het.",
     "emptyParticipants": "Deelnemers",
     "emptyRounds": "Rondes",
@@ -217,24 +217,24 @@
     "step2StartMonth": "Beginmaand",
     "step2StartMonthHint": "Die eerste maand waarvoor jy konsepkoppels wil maak.",
     "step2HorizonLabel": "Hoe ver vooruit voorberei",
-    "step2HorizonHint": "Een ronde is een maand. \'n Jaar maak twaalf maandrondes gelyktydig.",
+    "step2HorizonHint": "Een ronde is een maand. 'n Jaar maak twaalf maandrondes gelyktydig.",
     "step2HorizonRound": "Een ronde",
     "step2HorizonQuarter": "Kwartaal",
     "step2HorizonYear": "Jaar",
     "step2GenerateBtn": "Rondes voorberei",
-    "step2Help": "Koppels word outomaties gegenereer met die deelnemers soos hulle tans in die blad is. Klik \'n maand oop om die verbindings na te gaan, handmatig te skuif en goed te keur.",
+    "step2Help": "Koppels word outomaties gegenereer met die deelnemers soos hulle tans in die blad is. Klik 'n maand oop om die verbindings na te gaan, handmatig te skuif en goed te keur.",
     "step2RoundsTitle": "Rondes in die beplanning",
-    "step2RoundsHint": "Klik \'n maand oop vir koppels, blad en goedkeuring.",
-    "step2NoRounds": "Nog geen rondes nie. Kies \'n beginmaand en stel \'n ronde, kwartaal of jaar voor.",
+    "step2RoundsHint": "Klik 'n maand oop vir koppels, blad en goedkeuring.",
+    "step2NoRounds": "Nog geen rondes nie. Kies 'n beginmaand en stel 'n ronde, kwartaal of jaar voor.",
     "step2MatchesTitle": "Koppels aanpas",
-    "step2MatchesHint": "Sleep \'n gasheer of eter na \'n ander ry om te wissel. Groen is moontlik, rooi is nie. Permanente blokkades stel jy in die blad onder Nie saam nie.",
+    "step2MatchesHint": "Sleep 'n gasheer of eter na 'n ander ry om te wissel. Groen is moontlik, rooi is nie. Permanente blokkades stel jy in die blad onder Nie saam nie.",
     "step2SheetBtn": "Blad met aanmeldings",
     "step2BackToDraft": "Terug na konsep",
     "step2ApproveBtn": "Goedkeur + e-posse",
     "step3Eyebrow": "Stap 3",
     "step3Title": "E-posse voorberei",
     "step3NoteTitle": "Hier stel jy in watter e-posse die stelsel stuur en wat daarin staan.",
-    "step3NoteBody": "Die stelsel vul die korrekte persoonlike URL per koppel in. Skakel \'n e-pos af as jy daardie stap nie wil gebruik nie. Stuur gebeur in stap 4.",
+    "step3NoteBody": "Die stelsel vul die korrekte persoonlike URL per koppel in. Skakel 'n e-pos af as jy daardie stap nie wil gebruik nie. Stuur gebeur in stap 4.",
     "step3TemplateOn": "Aan",
     "step3TemplateOff": "Af",
     "step3EnableLabel": "Stuur hierdie e-pos",
@@ -305,7 +305,7 @@
     "worksheetColProposed": "Voorgestelde dae",
     "worksheetColFinal": "Finale dag",
     "worksheetColLinks": "Skakels",
-    "worksheetNoMatches": "Nog geen koppels nie. Genereer eers \'n ronde of voer die demo-saad uit.",
+    "worksheetNoMatches": "Nog geen koppels nie. Genereer eers 'n ronde of voer die demo-saad uit.",
     "statusDraft": "Konsep",
     "statusHostInvited": "Gasheer genooi",
     "statusHostResponded": "Gasheer het geantwoord",
@@ -355,5 +355,4 @@
     "FALLBACK_EATER_label": "Terugval eter",
     "FALLBACK_EATER_desc": "Gestuur aan die eter as die vormvloei nie betyds voltooi is nie."
   }
-}
 }
