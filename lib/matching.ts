@@ -372,20 +372,25 @@ export async function generateRoundForMonth(
         pass.allowPreviousConnection && priorPairs.has(pairKey(a.host.id, request.eater.id)) ? 500 : 0;
       const bRepeatPenalty =
         pass.allowPreviousConnection && priorPairs.has(pairKey(b.host.id, request.eater.id)) ? 500 : 0;
+      // Mild bonus for BOTH-mode hosts who have no assignment yet — keeps them in the running
+      const aUnusedBothBonus = (a.host.mode === ParticipationMode.BOTH && !currentRoles.has(a.host.id)) ? -15 : 0;
+      const bUnusedBothBonus = (b.host.mode === ParticipationMode.BOTH && !currentRoles.has(b.host.id)) ? -15 : 0;
       const aScore =
         rolePreferenceScore(a.host, "HOST", roleHistory) +
         a.hostedCount * 20 +
         a.slotIndex * 3 +
         (a.remainingCapacity - request.partySize) * 2 +
         aRepeatPenalty +
-        (connectionHistory.get(aConnectionKey) || 0) * 250;
+        (connectionHistory.get(aConnectionKey) || 0) * 250 +
+        aUnusedBothBonus;
       const bScore =
         rolePreferenceScore(b.host, "HOST", roleHistory) +
         b.hostedCount * 20 +
         b.slotIndex * 3 +
         (b.remainingCapacity - request.partySize) * 2 +
         bRepeatPenalty +
-        (connectionHistory.get(bConnectionKey) || 0) * 250;
+        (connectionHistory.get(bConnectionKey) || 0) * 250 +
+        bUnusedBothBonus;
       return aScore - bScore;
     })[0];
 
@@ -428,6 +433,95 @@ export async function generateRoundForMonth(
     remainingRequests = nextRemainingRequests;
     if (remainingRequests.length === 0) {
       break;
+    }
+  }
+
+  // Rescue pass: for any still-unmatched eater request, try all hosts
+  // (allow previous connections + dual roles, prefer hosts with 0 assignments)
+  if (remainingRequests.length > 0) {
+    const rescueRemaining: EaterRequest[] = [];
+    for (const request of remainingRequests) {
+      const assignedHostIds = new Set(assignments.map((a) => a.hostId));
+      const candidates = hostBuckets.filter((bucket) => {
+        const key = pairKey(bucket.host.id, request.eater.id);
+        const connection = connectionKey(bucket.host.id, request.eater.id);
+        return (
+          bucket.host.id !== request.eater.id &&
+          bucket.remainingCapacity >= request.partySize &&
+          compatibleMatch(bucket.host, request.eater) &&
+          !adminBlocksMatch(bucket.host, request.eater, adminNoMatch) &&
+          !currentPairs.has(key) &&
+          !currentConnections.has(connection)
+        );
+      });
+
+      if (candidates.length === 0) {
+        rescueRemaining.push(request);
+        continue;
+      }
+
+      const selected = shuffle(candidates).sort((a, b) => {
+        // Strongly prefer hosts who have no assignment yet
+        const assignedHostIds2 = assignedHostIds;
+        const aBonus = !assignedHostIds2.has(a.host.id) ? -40 : 0;
+        const bBonus = !assignedHostIds2.has(b.host.id) ? -40 : 0;
+        return (a.hostedCount * 20 + aBonus) - (b.hostedCount * 20 + bBonus);
+      })[0];
+
+      selected.remainingCapacity -= request.partySize;
+      selected.hostedCount += 1;
+      currentPairs.add(pairKey(selected.host.id, request.eater.id));
+      currentConnections.add(connectionKey(selected.host.id, request.eater.id));
+      addCurrentRole(currentRoles, selected.host.id, "HOST");
+      addCurrentRole(currentRoles, request.eater.id, "EATER");
+
+      assignments.push({
+        roundId: round.id,
+        hostId: selected.host.id,
+        eaterId: request.eater.id,
+        partySize: request.partySize,
+        hostToken: createToken(),
+        eaterToken: createToken()
+      });
+    }
+
+    // Last-resort: allow bidirectional pairs (A hosts B while B hosts A)
+    for (const request of rescueRemaining) {
+      const candidates = hostBuckets.filter((bucket) => {
+        const key = pairKey(bucket.host.id, request.eater.id);
+        return (
+          bucket.host.id !== request.eater.id &&
+          bucket.remainingCapacity >= request.partySize &&
+          compatibleMatch(bucket.host, request.eater) &&
+          !adminBlocksMatch(bucket.host, request.eater, adminNoMatch) &&
+          !currentPairs.has(key)
+        );
+      });
+
+      if (candidates.length === 0) continue;
+
+      const assignedHostIds = new Set(assignments.map((a) => a.hostId));
+      const selected = shuffle(candidates).sort((a, b) => {
+        const aBonus = !assignedHostIds.has(a.host.id) ? -40 : 0;
+        const bBonus = !assignedHostIds.has(b.host.id) ? -40 : 0;
+        return (a.hostedCount * 20 + aBonus) - (b.hostedCount * 20 + bBonus);
+      })[0];
+
+      selected.remainingCapacity -= request.partySize;
+      selected.hostedCount += 1;
+      currentPairs.add(pairKey(selected.host.id, request.eater.id));
+      currentConnections.add(connectionKey(selected.host.id, request.eater.id));
+      addCurrentRole(currentRoles, selected.host.id, "HOST");
+      addCurrentRole(currentRoles, request.eater.id, "EATER");
+
+      assignments.push({
+        roundId: round.id,
+        hostId: selected.host.id,
+        eaterId: request.eater.id,
+        partySize: request.partySize,
+        hostToken: createToken(),
+        eaterToken: createToken()
+      });
     }
   }
 
