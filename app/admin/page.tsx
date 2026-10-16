@@ -443,7 +443,7 @@ function RoundsAccordion({
                   {draftCount > 0 ? t("roundDraftSuffix", { n: draftCount }) : ""}
                 </small>
               </span>
-              <form action={deleteRoundAction} onClick={(e) => e.stopPropagation()}>
+              <form action={deleteRoundAction}>
                 <input type="hidden" name="adminKey" value={adminKey} />
                 <input type="hidden" name="roundId" value={round.id} />
                 <button
