@@ -43,6 +43,7 @@ type Assignment = {
 type AssignmentPass = {
   allowPreviousConnection: boolean;
   allowDualRoleInRound: boolean;
+  saveBothHostsForPhase2: boolean;
 };
 
 function canEat(mode: ParticipationMode) {
@@ -350,6 +351,15 @@ export async function generateRoundForMonth(
     // HOST-only hosts that have no eaters yet must be filled (they can't fall back to ETER)
     const hostOnlyBonus =
       bucket.host.mode === ParticipationMode.HOST && !currentRoles.has(bucket.host.id) ? -15 : 0;
+    // Prefer filling already-used host buckets to reduce total rows (consolidation)
+    const consolidationBonus = currentRoles.has(bucket.host.id) ? -80 : 0;
+    // In Phase 1: save BOTH-mode unused capacity for Phase 2 pairing
+    const bothReservePenalty =
+      pass.saveBothHostsForPhase2 &&
+      bucket.host.mode === ParticipationMode.BOTH &&
+      !currentRoles.has(bucket.host.id)
+        ? 80
+        : 0;
     return (
       rolePreferenceScore(bucket.host, "HOST", roleHistory) +
       bucket.hostedCount * 20 +
@@ -357,7 +367,9 @@ export async function generateRoundForMonth(
       (bucket.remainingCapacity - partySize) * 2 +
       repeatPenalty +
       (connectionHistory.get(connKey) || 0) * 250 +
-      hostOnlyBonus
+      hostOnlyBonus +
+      consolidationBonus +
+      bothReservePenalty
     );
   }
 
@@ -389,11 +401,12 @@ export async function generateRoundForMonth(
   }
 
   // 4-pass matching for EAT-only
+  // saveBothHostsForPhase2: true reserves BOTH-mode unused capacity for Phase 2 pairing
   const passes: AssignmentPass[] = [
-    { allowPreviousConnection: false, allowDualRoleInRound: false },
-    { allowPreviousConnection: false, allowDualRoleInRound: true },
-    { allowPreviousConnection: true,  allowDualRoleInRound: false },
-    { allowPreviousConnection: true,  allowDualRoleInRound: true }
+    { allowPreviousConnection: false, allowDualRoleInRound: false, saveBothHostsForPhase2: true },
+    { allowPreviousConnection: false, allowDualRoleInRound: true,  saveBothHostsForPhase2: true },
+    { allowPreviousConnection: true,  allowDualRoleInRound: false, saveBothHostsForPhase2: true },
+    { allowPreviousConnection: true,  allowDualRoleInRound: true,  saveBothHostsForPhase2: true }
   ];
 
   const sortedEatRequests = shuffle(eatOnlyRequests).sort((a, b) => {
