@@ -304,15 +304,16 @@ export async function generateRoundForMonth(
     }
   }
 
-  const eaterRequests: EaterRequest[] = [];
+  // ── Phase 1: EAT-only eater requests ────────────────────────────────────────
+  // Only EAT-mode participants generate mandatory eater requests. BOTH-mode
+  // participants are handled separately in Phase 2 so we never create more
+  // assignments than strictly needed for full participation.
+  const eatOnlyRequests: EaterRequest[] = [];
   for (const participant of participants) {
-    if (!canEat(participant.mode)) {
-      continue;
-    }
-
+    if (participant.mode !== ParticipationMode.EAT) continue;
     const count = desiredCount(participant.eaterFrequency, participant.createdAt, month);
     for (let index = 0; index < count; index += 1) {
-      eaterRequests.push({
+      eatOnlyRequests.push({
         eater: participant,
         partySize: Math.max(1, participant.comingWithCount),
         requestIndex: index
@@ -324,228 +325,204 @@ export async function generateRoundForMonth(
   const currentConnections = new Set<string>();
   const currentRoles = new Map<string, Set<Role>>();
   const assignments: Assignment[] = [];
-  const sortedRequests = shuffle(eaterRequests).sort((a, b) => {
-    const partySizeDifference = b.partySize - a.partySize;
-    if (partySizeDifference !== 0) {
-      return partySizeDifference;
-    }
 
-    // EAT-only requests before BOTH requests (same party size): ensures HOST-only hosts
-    // get eaters from EAT-only people first, so BOTH people's ETER requests can be skipped
-    const aModeOrder = a.eater.mode === ParticipationMode.EAT ? 0 : 1;
-    const bModeOrder = b.eater.mode === ParticipationMode.EAT ? 0 : 1;
-    if (aModeOrder !== bModeOrder) {
-      return aModeOrder - bModeOrder;
-    }
+  function makeAssignment(bucket: HostBucket, eater: Participant, partySize: number) {
+    bucket.remainingCapacity -= partySize;
+    bucket.hostedCount += 1;
+    currentPairs.add(pairKey(bucket.host.id, eater.id));
+    currentConnections.add(connectionKey(bucket.host.id, eater.id));
+    addCurrentRole(currentRoles, bucket.host.id, "HOST");
+    addCurrentRole(currentRoles, eater.id, "EATER");
+    assignments.push({
+      roundId: round.id,
+      hostId: bucket.host.id,
+      eaterId: eater.id,
+      partySize,
+      hostToken: createToken(),
+      eaterToken: createToken()
+    });
+  }
 
-    const roleDifference =
-      rolePreferenceScore(a.eater, "EATER", roleHistory) - rolePreferenceScore(b.eater, "EATER", roleHistory);
-    if (roleDifference !== 0) {
-      return roleDifference;
-    }
+  function scoreBucket(bucket: HostBucket, partySize: number, eaterId: string, pass: AssignmentPass) {
+    const connKey = connectionKey(bucket.host.id, eaterId);
+    const repeatPenalty =
+      pass.allowPreviousConnection && priorPairs.has(pairKey(bucket.host.id, eaterId)) ? 500 : 0;
+    // HOST-only hosts that have no eaters yet must be filled (they can't fall back to ETER)
+    const hostOnlyBonus =
+      bucket.host.mode === ParticipationMode.HOST && !currentRoles.has(bucket.host.id) ? -15 : 0;
+    return (
+      rolePreferenceScore(bucket.host, "HOST", roleHistory) +
+      bucket.hostedCount * 20 +
+      bucket.slotIndex * 3 +
+      (bucket.remainingCapacity - partySize) * 2 +
+      repeatPenalty +
+      (connectionHistory.get(connKey) || 0) * 250 +
+      hostOnlyBonus
+    );
+  }
 
-    const aHistory = eaterHistory.get(a.eater.id) || 0;
-    const bHistory = eaterHistory.get(b.eater.id) || 0;
-    return aHistory - bHistory;
-  });
-
-  function assignRequest(request: EaterRequest, pass: AssignmentPass) {
+  function tryAssignEat(request: EaterRequest, pass: AssignmentPass): boolean {
     if (!pass.allowDualRoleInRound && hasOtherRole(currentRoles, request.eater.id, "EATER")) {
       return false;
     }
-
-    // For BOTH-mode eaters who already have a HOST role: only assign them as ETER when
-    // there is at least one host with 0 current assignments that needs an eater to participate.
-    if (
-      request.eater.mode === ParticipationMode.BOTH &&
-      hasOtherRole(currentRoles, request.eater.id, "EATER")
-    ) {
-      const hostNeedsEater = hostBuckets.some(
-        (b) =>
-          !currentRoles.has(b.host.id) &&
-          b.host.id !== request.eater.id &&
-          b.remainingCapacity >= request.partySize
-      );
-      if (!hostNeedsEater) return false;
-    }
-
     const candidates = hostBuckets.filter((bucket) => {
       const key = pairKey(bucket.host.id, request.eater.id);
-      const connection = connectionKey(bucket.host.id, request.eater.id);
+      const conn = connectionKey(bucket.host.id, request.eater.id);
       return (
         bucket.host.id !== request.eater.id &&
         bucket.remainingCapacity >= request.partySize &&
         compatibleMatch(bucket.host, request.eater) &&
         !adminBlocksMatch(bucket.host, request.eater, adminNoMatch) &&
         !currentPairs.has(key) &&
-        !currentConnections.has(connection) &&
-        (pass.allowPreviousConnection || !priorConnections.has(connection)) &&
+        !currentConnections.has(conn) &&
+        (pass.allowPreviousConnection || !priorConnections.has(conn)) &&
         (pass.allowDualRoleInRound || !hasOtherRole(currentRoles, bucket.host.id, "HOST"))
       );
     });
-
-    if (candidates.length === 0) {
-      return false;
-    }
-
-    const selected = shuffle(candidates).sort((a, b) => {
-      const aConnectionKey = connectionKey(a.host.id, request.eater.id);
-      const bConnectionKey = connectionKey(b.host.id, request.eater.id);
-      const aRepeatPenalty =
-        pass.allowPreviousConnection && priorPairs.has(pairKey(a.host.id, request.eater.id)) ? 500 : 0;
-      const bRepeatPenalty =
-        pass.allowPreviousConnection && priorPairs.has(pairKey(b.host.id, request.eater.id)) ? 500 : 0;
-      // HOST-only hosts who have no eaters yet get a bonus — they depend entirely on getting
-      // eaters to participate (can't fall back to ETER role), so they should be filled first
-      const aHostOnlyBonus = (a.host.mode === ParticipationMode.HOST && !currentRoles.has(a.host.id)) ? -15 : 0;
-      const bHostOnlyBonus = (b.host.mode === ParticipationMode.HOST && !currentRoles.has(b.host.id)) ? -15 : 0;
-      const aScore =
-        rolePreferenceScore(a.host, "HOST", roleHistory) +
-        a.hostedCount * 20 +
-        a.slotIndex * 3 +
-        (a.remainingCapacity - request.partySize) * 2 +
-        aRepeatPenalty +
-        (connectionHistory.get(aConnectionKey) || 0) * 250 +
-        aHostOnlyBonus;
-      const bScore =
-        rolePreferenceScore(b.host, "HOST", roleHistory) +
-        b.hostedCount * 20 +
-        b.slotIndex * 3 +
-        (b.remainingCapacity - request.partySize) * 2 +
-        bRepeatPenalty +
-        (connectionHistory.get(bConnectionKey) || 0) * 250 +
-        bHostOnlyBonus;
-      return aScore - bScore;
-    })[0];
-
-    selected.remainingCapacity -= request.partySize;
-    selected.hostedCount += 1;
-    currentPairs.add(pairKey(selected.host.id, request.eater.id));
-    currentConnections.add(connectionKey(selected.host.id, request.eater.id));
-    addCurrentRole(currentRoles, selected.host.id, "HOST");
-    addCurrentRole(currentRoles, request.eater.id, "EATER");
-
-    assignments.push({
-      roundId: round.id,
-      hostId: selected.host.id,
-      eaterId: request.eater.id,
-      partySize: request.partySize,
-      hostToken: createToken(),
-      eaterToken: createToken()
-    });
-
+    if (candidates.length === 0) return false;
+    const selected = shuffle(candidates).sort(
+      (a, b) => scoreBucket(a, request.partySize, request.eater.id, pass) -
+                scoreBucket(b, request.partySize, request.eater.id, pass)
+    )[0];
+    makeAssignment(selected, request.eater, request.partySize);
     return true;
   }
 
+  // 4-pass matching for EAT-only
   const passes: AssignmentPass[] = [
     { allowPreviousConnection: false, allowDualRoleInRound: false },
     { allowPreviousConnection: false, allowDualRoleInRound: true },
-    { allowPreviousConnection: true, allowDualRoleInRound: false },
-    { allowPreviousConnection: true, allowDualRoleInRound: true }
+    { allowPreviousConnection: true,  allowDualRoleInRound: false },
+    { allowPreviousConnection: true,  allowDualRoleInRound: true }
   ];
 
-  let remainingRequests = sortedRequests;
+  const sortedEatRequests = shuffle(eatOnlyRequests).sort((a, b) => {
+    const diff = b.partySize - a.partySize;
+    if (diff !== 0) return diff;
+    return (eaterHistory.get(a.eater.id) || 0) - (eaterHistory.get(b.eater.id) || 0);
+  });
+
+  let remainingEatRequests = sortedEatRequests;
   for (const pass of passes) {
-    const nextRemainingRequests: EaterRequest[] = [];
-
-    for (const request of remainingRequests) {
-      if (!assignRequest(request, pass)) {
-        nextRemainingRequests.push(request);
-      }
+    const next: EaterRequest[] = [];
+    for (const req of remainingEatRequests) {
+      if (!tryAssignEat(req, pass)) next.push(req);
     }
-
-    remainingRequests = nextRemainingRequests;
-    if (remainingRequests.length === 0) {
-      break;
-    }
+    remainingEatRequests = next;
+    if (remainingEatRequests.length === 0) break;
   }
 
-  // Rescue pass: for any still-unmatched eater request, try all hosts
-  // (allow previous connections + dual roles, prefer hosts with 0 assignments)
-  if (remainingRequests.length > 0) {
-    const rescueRemaining: EaterRequest[] = [];
-    for (const request of remainingRequests) {
-      const assignedHostIds = new Set(assignments.map((a) => a.hostId));
-      const candidates = hostBuckets.filter((bucket) => {
-        const key = pairKey(bucket.host.id, request.eater.id);
-        const connection = connectionKey(bucket.host.id, request.eater.id);
-        return (
-          bucket.host.id !== request.eater.id &&
-          bucket.remainingCapacity >= request.partySize &&
-          compatibleMatch(bucket.host, request.eater) &&
-          !adminBlocksMatch(bucket.host, request.eater, adminNoMatch) &&
-          !currentPairs.has(key) &&
-          !currentConnections.has(connection)
-        );
-      });
+  // Rescue: EAT-only stragglers (allow prior connections + drop duplicate-connection check)
+  for (const req of remainingEatRequests) {
+    const candidates = hostBuckets.filter((b) => {
+      const key = pairKey(b.host.id, req.eater.id);
+      return (
+        b.host.id !== req.eater.id &&
+        b.remainingCapacity >= req.partySize &&
+        compatibleMatch(b.host, req.eater) &&
+        !adminBlocksMatch(b.host, req.eater, adminNoMatch) &&
+        !currentPairs.has(key)
+      );
+    });
+    if (candidates.length === 0) continue;
+    const assignedIds = new Set(assignments.map((a) => a.hostId));
+    const selected = shuffle(candidates).sort((a, b) => {
+      const aBonus = !assignedIds.has(a.host.id) ? -40 : 0;
+      const bBonus = !assignedIds.has(b.host.id) ? -40 : 0;
+      return (a.hostedCount * 20 + aBonus) - (b.hostedCount * 20 + bBonus);
+    })[0];
+    makeAssignment(selected, req.eater, req.partySize);
+  }
 
-      if (candidates.length === 0) {
-        rescueRemaining.push(request);
-        continue;
+  // ── Phase 2: BOTH-mode coverage ──────────────────────────────────────────────
+  // Find BOTH participants who should participate this month but have no role yet.
+  // Goal: minimum extra assignments — try HOST pairing first, then ETER fallback.
+  const covered = new Set([...assignments.map((a) => a.hostId), ...assignments.map((a) => a.eaterId)]);
+
+  const bothActive = participants.filter((p) => {
+    if (p.mode !== ParticipationMode.BOTH) return false;
+    const eatCount = desiredCount(p.eaterFrequency, p.createdAt, month);
+    const hostCount = desiredCount(p.hostFrequency, p.createdAt, month);
+    return eatCount > 0 || hostCount > 0;
+  });
+
+  // Sort largest party first (they have the fewest hosts that can accept them)
+  const uncoveredBoth = bothActive
+    .filter((p) => !covered.has(p.id))
+    .sort((a, b) => (b.comingWithCount ?? 1) - (a.comingWithCount ?? 1));
+
+  if (uncoveredBoth.length > 0) {
+    const p2done = new Set<string>();
+
+    // Pass A: pair two uncovered BOTH people — one hosts the other's group.
+    // Process without prior-connection restriction first, then relax it.
+    for (const allowPriorA of [false, true]) {
+      for (const person of uncoveredBoth) {
+        if (p2done.has(person.id) || covered.has(person.id)) continue;
+        const pSize = Math.max(1, person.comingWithCount ?? 1);
+
+        // Find an uncovered BOTH who can host this person
+        const hostCandidate = uncoveredBoth.find((h) => {
+          if (p2done.has(h.id) || covered.has(h.id) || h.id === person.id) return false;
+          const bucket = hostBuckets.find(
+            (b) => b.host.id === h.id && b.remainingCapacity >= pSize
+          );
+          if (!bucket) return false;
+          if (!compatibleMatch(h, person)) return false;
+          if (adminBlocksMatch(h, person, adminNoMatch)) return false;
+          const conn = connectionKey(h.id, person.id);
+          if (currentConnections.has(conn)) return false;
+          if (!allowPriorA && priorConnections.has(conn)) return false;
+          return true;
+        });
+
+        if (hostCandidate) {
+          const bucket = hostBuckets.find(
+            (b) => b.host.id === hostCandidate.id && b.remainingCapacity >= pSize
+          );
+          if (bucket) {
+            makeAssignment(bucket, person, pSize);
+            p2done.add(person.id);
+            p2done.add(hostCandidate.id);
+            covered.add(person.id);
+            covered.add(hostCandidate.id);
+          }
+        }
       }
-
-      const selected = shuffle(candidates).sort((a, b) => {
-        // Strongly prefer hosts who have no assignment yet
-        const assignedHostIds2 = assignedHostIds;
-        const aBonus = !assignedHostIds2.has(a.host.id) ? -40 : 0;
-        const bBonus = !assignedHostIds2.has(b.host.id) ? -40 : 0;
-        return (a.hostedCount * 20 + aBonus) - (b.hostedCount * 20 + bBonus);
-      })[0];
-
-      selected.remainingCapacity -= request.partySize;
-      selected.hostedCount += 1;
-      currentPairs.add(pairKey(selected.host.id, request.eater.id));
-      currentConnections.add(connectionKey(selected.host.id, request.eater.id));
-      addCurrentRole(currentRoles, selected.host.id, "HOST");
-      addCurrentRole(currentRoles, request.eater.id, "EATER");
-
-      assignments.push({
-        roundId: round.id,
-        hostId: selected.host.id,
-        eaterId: request.eater.id,
-        partySize: request.partySize,
-        hostToken: createToken(),
-        eaterToken: createToken()
-      });
     }
 
-    // Last-resort: allow bidirectional pairs (A hosts B while B hosts A)
-    for (const request of rescueRemaining) {
-      const candidates = hostBuckets.filter((bucket) => {
-        const key = pairKey(bucket.host.id, request.eater.id);
-        return (
-          bucket.host.id !== request.eater.id &&
-          bucket.remainingCapacity >= request.partySize &&
-          compatibleMatch(bucket.host, request.eater) &&
-          !adminBlocksMatch(bucket.host, request.eater, adminNoMatch) &&
-          !currentPairs.has(key)
-        );
-      });
+    // Pass B: eat at any host that has remaining capacity, with graceful fallback.
+    // Prefer: no prior connection, no dual role → relax each constraint in order.
+    for (const allowDualB of [false, true]) {
+      for (const allowPriorB of [false, true]) {
+        for (const person of uncoveredBoth) {
+          if (covered.has(person.id)) continue;
+          const pSize = Math.max(1, person.comingWithCount ?? 1);
+          const candidates = shuffle(
+            hostBuckets.filter((b) => {
+              const key = pairKey(b.host.id, person.id);
+              const conn = connectionKey(b.host.id, person.id);
+              return (
+                b.host.id !== person.id &&
+                b.remainingCapacity >= pSize &&
+                compatibleMatch(b.host, person) &&
+                !adminBlocksMatch(b.host, person, adminNoMatch) &&
+                !currentPairs.has(key) &&
+                !currentConnections.has(conn) &&
+                (allowPriorB || !priorConnections.has(conn)) &&
+                (allowDualB || !hasOtherRole(currentRoles, b.host.id, "HOST"))
+              );
+            })
+          ).sort((a, b) => a.remainingCapacity - b.remainingCapacity); // tightest fit first
 
-      if (candidates.length === 0) continue;
-
-      const assignedHostIds = new Set(assignments.map((a) => a.hostId));
-      const selected = shuffle(candidates).sort((a, b) => {
-        const aBonus = !assignedHostIds.has(a.host.id) ? -40 : 0;
-        const bBonus = !assignedHostIds.has(b.host.id) ? -40 : 0;
-        return (a.hostedCount * 20 + aBonus) - (b.hostedCount * 20 + bBonus);
-      })[0];
-
-      selected.remainingCapacity -= request.partySize;
-      selected.hostedCount += 1;
-      currentPairs.add(pairKey(selected.host.id, request.eater.id));
-      currentConnections.add(connectionKey(selected.host.id, request.eater.id));
-      addCurrentRole(currentRoles, selected.host.id, "HOST");
-      addCurrentRole(currentRoles, request.eater.id, "EATER");
-
-      assignments.push({
-        roundId: round.id,
-        hostId: selected.host.id,
-        eaterId: request.eater.id,
-        partySize: request.partySize,
-        hostToken: createToken(),
-        eaterToken: createToken()
-      });
+          if (candidates.length > 0) {
+            makeAssignment(candidates[0], person, pSize);
+            covered.add(person.id);
+          }
+        }
+        if (uncoveredBoth.every((p) => covered.has(p.id))) break;
+      }
+      if (uncoveredBoth.every((p) => covered.has(p.id))) break;
     }
   }
 
@@ -557,7 +534,7 @@ export async function generateRoundForMonth(
     roundId: round.id,
     month,
     matched: assignments.length,
-    requested: eaterRequests.length,
+    requested: eatOnlyRequests.length + bothActive.length,
     hosts: hostBuckets.length
   };
 }
