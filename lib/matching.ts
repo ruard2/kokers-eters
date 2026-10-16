@@ -346,6 +346,21 @@ export async function generateRoundForMonth(
       return false;
     }
 
+    // For BOTH-mode eaters who already have a HOST role: only assign them as ETER when
+    // there is at least one host with 0 current assignments that needs an eater to participate.
+    if (
+      request.eater.mode === ParticipationMode.BOTH &&
+      hasOtherRole(currentRoles, request.eater.id, "EATER")
+    ) {
+      const hostNeedsEater = hostBuckets.some(
+        (b) =>
+          !currentRoles.has(b.host.id) &&
+          b.host.id !== request.eater.id &&
+          b.remainingCapacity >= request.partySize
+      );
+      if (!hostNeedsEater) return false;
+    }
+
     const candidates = hostBuckets.filter((bucket) => {
       const key = pairKey(bucket.host.id, request.eater.id);
       const connection = connectionKey(bucket.host.id, request.eater.id);
