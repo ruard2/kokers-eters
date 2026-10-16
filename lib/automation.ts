@@ -1,7 +1,7 @@
 import { MatchStatus, RoundStatus } from "@prisma/client";
 import { addDays, addMonths, toMonthStart } from "./dates";
 import { prisma } from "./db";
-import { sendEaterIntro, sendHostInvite, sendPreferenceCheck } from "./mailer";
+import { sendEaterIntro, sendHostInvite, sendPreferenceCheck, sendSimpleHost, sendSimpleEater } from "./mailer";
 import { generateRoundForMonth } from "./matching";
 
 const matchInclude = {
@@ -68,13 +68,28 @@ export async function sendHostInvitesForRound(
       console.error(`[mail error] host invite for match ${match.id}:`, error);
     }
 
-    const anySent =
-      eaterIntroResult.status === "sent" || eaterIntroResult.status === "skipped_existing" ||
-      hostInviteResult.status === "sent" || hostInviteResult.status === "skipped_existing";
+    // Try SIMPLE_HOST (simple flow: host gets eater info and contacts them directly)
+    let simpleHostResult: { status: string } = { status: "skipped_disabled" };
+    try {
+      simpleHostResult = await sendSimpleHost(match);
+    } catch (error) {
+      console.error(`[mail error] simple host for match ${match.id}:`, error);
+    }
 
-    // If both disabled (no templates on), still advance — match exists, just no mail.
-    const bothDisabled =
-      eaterIntroResult.status === "skipped_disabled" && hostInviteResult.status === "skipped_disabled";
+    // Try SIMPLE_EATER (simple flow: eater told host will contact them)
+    let simpleEaterResult: { status: string } = { status: "skipped_disabled" };
+    try {
+      simpleEaterResult = await sendSimpleEater(match);
+    } catch (error) {
+      console.error(`[mail error] simple eater for match ${match.id}:`, error);
+    }
+
+    const anySent = [eaterIntroResult, hostInviteResult, simpleHostResult, simpleEaterResult]
+      .some((r) => r.status === "sent" || r.status === "skipped_existing");
+
+    // If all disabled (no templates on), still advance — match exists, just no mail.
+    const bothDisabled = [eaterIntroResult, hostInviteResult, simpleHostResult, simpleEaterResult]
+      .every((r) => r.status === "skipped_disabled");
 
     if (!anySent && !bothDisabled) {
       continue;

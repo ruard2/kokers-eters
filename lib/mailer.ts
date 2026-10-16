@@ -370,3 +370,80 @@ export async function sendFallbackEmails(match: MatchWithPeople, reason: "host" 
     html: layout(eaterRendered.title, eaterRendered.html)
   });
 }
+
+// Simple match notifications — no forms, just contact info.
+// The host is notified once per match (may receive multiple mails for shared dinners).
+
+export async function sendSimpleHost(match: MatchWithPeople) {
+  const cannotDaysText = match.eater.cannotEatDays?.trim()
+    ? `Zij kunnen niet op: ${match.eater.cannotEatDays.trim()}`
+    : "";
+
+  const rendered = await renderMailTemplate("SIMPLE_HOST", {
+    hostName: match.host.name,
+    eaterName: match.eater.name,
+    eaterEmail: match.eater.email,
+    eaterWhatsapp: fallbackText(match.eater.whatsapp, "Niet opgegeven"),
+    allergies: fallbackText(match.eater.allergies),
+    month: displayMonth(match.round.month),
+    partySize: match.partySize,
+    cannotEatDaysText
+  }, match.host.organizationId);
+
+  if (!rendered.enabled) {
+    return { status: "skipped_disabled" };
+  }
+
+  return sendEmail({
+    to: match.host.email,
+    participantId: match.hostId,
+    matchId: match.id,
+    type: "SIMPLE_HOST",
+    contextKey: `simple-host:${match.id}`,
+    subject: rendered.subject,
+    html: layout(rendered.title, rendered.html)
+  });
+}
+
+export async function sendSimpleEater(match: MatchWithPeople) {
+  // Check for fellow eaters at the same host in the same round
+  const siblingMatches = await prisma.mealMatch.findMany({
+    where: {
+      roundId: match.roundId,
+      hostId: match.hostId,
+      id: { not: match.id },
+      status: { not: "CANCELLED" }
+    },
+    include: { eater: true }
+  });
+
+  const fellowEatersText = siblingMatches.length > 0
+    ? `Je eet samen met: ${siblingMatches.map((m) => m.eater.name).join(" en ")}.`
+    : "";
+
+  const rendered = await renderMailTemplate("SIMPLE_EATER", {
+    eaterName: match.eater.name,
+    hostName: match.host.name,
+    hostEmail: match.host.email,
+    hostWhatsapp: fallbackText(match.host.whatsapp, "Niet opgegeven"),
+    address: fallbackText(match.host.address, "Adres volgt via de koker."),
+    allergies: fallbackText(match.eater.allergies),
+    month: displayMonth(match.round.month),
+    partySize: match.partySize,
+    fellowEatersText
+  }, match.eater.organizationId);
+
+  if (!rendered.enabled) {
+    return { status: "skipped_disabled" };
+  }
+
+  return sendEmail({
+    to: match.eater.email,
+    participantId: match.eaterId,
+    matchId: match.id,
+    type: "SIMPLE_EATER",
+    contextKey: `simple-eater:${match.id}`,
+    subject: rendered.subject,
+    html: layout(rendered.title, rendered.html)
+  });
+}

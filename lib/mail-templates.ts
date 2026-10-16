@@ -9,7 +9,9 @@ export type MailTemplateType =
   | "CONFIRMATION_HOST"
   | "CONFIRMATION_EATER"
   | "FALLBACK_HOST"
-  | "FALLBACK_EATER";
+  | "FALLBACK_EATER"
+  | "SIMPLE_HOST"
+  | "SIMPLE_EATER";
 
 export type MailTemplateDefinition = {
   type: MailTemplateType;
@@ -230,6 +232,60 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "{{allergies}}"
     ].join("\n"),
     adminVisible: false,
+    defaultEnabled: false
+  },
+  {
+    // Simple match notification to the host — no form, host contacts eater directly.
+    type: "SIMPLE_HOST",
+    label: "Koppeling naar host",
+    description: "Naar de koker na goedkeuring: jij bent gekoppeld aan deze eter(s), neem contact op. Geen formulier nodig.",
+    title: "Je bent gekoppeld als koker voor {{month}}",
+    subject: "Eters & Kokers: je bent gekoppeld voor {{month}}",
+    body: [
+      "Hoi {{hostName}},",
+      "",
+      "Goed nieuws — voor {{month}} ben je gekoppeld aan {{eaterName}} ({{partySize}} persoon/personen).",
+      "",
+      "Contactgegevens:",
+      "E-mail: {{eaterEmail}}",
+      "WhatsApp/telefoon: {{eaterWhatsapp}}",
+      "",
+      "Allergieen of dieetwensen: {{allergies}}",
+      "",
+      "{{cannotEatDaysText}}",
+      "",
+      "Wil jij contact opnemen om samen een datum te prikken? Via mail, WhatsApp of telefoon — wat voor jou het fijnst is!",
+      "",
+      "Fijne maaltijd alvast!"
+    ].join("\n"),
+    adminVisible: true,
+    defaultEnabled: false
+  },
+  {
+    // Simple match notification to the eater — host will contact them.
+    type: "SIMPLE_EATER",
+    label: "Koppeling naar eter (passief)",
+    description: "Naar de eter na goedkeuring: je gaat eten bij deze koker, zij nemen contact op. Gebruik samen met 'Koppeling naar host'.",
+    title: "Je bent gekoppeld als eter voor {{month}}",
+    subject: "Eters & Kokers: je gaat eten in {{month}}",
+    body: [
+      "Hoi {{eaterName}},",
+      "",
+      "Goed nieuws — voor {{month}} ga je eten bij {{hostName}}!",
+      "",
+      "{{hostName}} neemt binnenkort contact met je op om een datum af te spreken. Voel je vrij om ook zelf het initiatief te nemen als dat fijner is:",
+      "E-mail: {{hostEmail}}",
+      "WhatsApp/telefoon: {{hostWhatsapp}}",
+      "",
+      "Adres: {{address}}",
+      "",
+      "{{fellowEatersText}}",
+      "",
+      "Jouw allergieen of dieetwensen die zijn doorgegeven: {{allergies}}",
+      "",
+      "Geniet ervan!"
+    ].join("\n"),
+    adminVisible: true,
     defaultEnabled: false
   },
   {
