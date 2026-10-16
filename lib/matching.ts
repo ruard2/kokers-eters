@@ -380,9 +380,10 @@ export async function generateRoundForMonth(
     const candidates = hostBuckets.filter((bucket) => {
       const key = pairKey(bucket.host.id, request.eater.id);
       const conn = connectionKey(bucket.host.id, request.eater.id);
-      // Only singles (partySize=1) may share a host; couples/families need an exclusive host
+      // Max 2 eters per host; couples/families need an exclusive host (no sharing)
       const existingAtBucket = assignments.filter((a) => a.hostId === bucket.host.id);
       const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
+      if (existingAtBucket.length >= 2) return false;
       if (bucketHasFamily || (request.partySize > 1 && existingAtBucket.length > 0)) return false;
       return (
         bucket.host.id !== request.eater.id &&
@@ -519,9 +520,10 @@ export async function generateRoundForMonth(
             hostBuckets.filter((b) => {
               const key = pairKey(b.host.id, person.id);
               const conn = connectionKey(b.host.id, person.id);
-              // Only singles may share a host; families need an exclusive host
+              // Max 2 eters per host; families need an exclusive host (no sharing)
               const existingAtBucket = assignments.filter((a) => a.hostId === b.host.id);
               const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
+              if (existingAtBucket.length >= 2) return false;
               if (bucketHasFamily || (pSize > 1 && existingAtBucket.length > 0)) return false;
               return (
                 b.host.id !== person.id &&
