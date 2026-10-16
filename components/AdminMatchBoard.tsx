@@ -453,17 +453,19 @@ export function AdminMatchBoard({ adminKey, disabled, initialMatches, participan
         ) : null}
 
         <div className={`match-board ${busy ? "busy" : ""} ${selected ? "checking" : ""} ${fullscreen ? "simple" : ""}`}>
-          {visibleMatches.map((match, index) => {
+          {[...visibleMatches].sort((a, b) => a.host.id.localeCompare(b.host.id)).map((match, index, sorted) => {
             const editable = !disabled && match.status === "DRAFT";
             const validation = validations.get(match.id);
             const isSource = selected?.matchId === match.id;
             const dropClass = selected
               ? isSource ? "drop-source" : validation?.ok ? "drop-ok" : "drop-bad"
               : "";
+            const prevMatch = index > 0 ? sorted[index - 1] : null;
+            const sameHostAsPrev = prevMatch?.host.id === match.host.id;
 
             return (
               <div
-                className={`match-row ${editable ? "editable" : "locked"} ${dropClass}`}
+                className={`match-row ${editable ? "editable" : "locked"} ${dropClass}${sameHostAsPrev ? " same-host" : ""}`}
                 key={match.id}
                 onDragOver={(event) => {
                   if (editable && selected) {

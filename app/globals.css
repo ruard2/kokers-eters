@@ -1389,6 +1389,41 @@ th {
   opacity: 0.72;
 }
 
+/* Same host as the row above: visually group as one dinner */
+.match-row.same-host {
+  border-top: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  margin-top: -4px;
+  padding-top: 4px;
+  position: relative;
+}
+.match-row.same-host::before {
+  background: #e8f1ec;
+  border-left: 2px solid #8ab59a;
+  border-right: 2px solid #8ab59a;
+  content: "";
+  height: 4px;
+  left: -1px;
+  position: absolute;
+  right: -1px;
+  top: -4px;
+}
+/* Hide the host tile on continuation rows — the host is already shown above */
+.match-row.same-host .host-tile {
+  background: #f5f8f6;
+  border-color: #d6e4da;
+  opacity: 0.55;
+}
+.match-row.same-host .host-tile strong {
+  display: none;
+}
+.match-row.same-host .host-tile::after {
+  color: #7a9e87;
+  content: "↑ zelfde diner";
+  font-size: 11px;
+}
+
 .match-board.checking .match-row.drop-ok {
   background: #eef8f1;
   border-color: #4a9b67;
