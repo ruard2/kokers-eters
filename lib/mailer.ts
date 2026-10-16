@@ -375,7 +375,7 @@ export async function sendFallbackEmails(match: MatchWithPeople, reason: "host" 
 // The host is notified once per match (may receive multiple mails for shared dinners).
 
 export async function sendSimpleHost(match: MatchWithPeople) {
-  const cannotDaysText = match.eater.cannotEatDays?.trim()
+  const cannotEatDaysText = match.eater.cannotEatDays?.trim()
     ? `Zij kunnen niet op: ${match.eater.cannotEatDays.trim()}`
     : "";
 
