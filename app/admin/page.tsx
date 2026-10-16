@@ -5,6 +5,7 @@ import {
   cancelMatchAction,
   clearDemoAction,
   deleteParticipantAction,
+  deleteRoundAction,
   generatePlanningAction,
   reopenRoundAction,
   seedDemoAction,
@@ -442,6 +443,18 @@ function RoundsAccordion({
                   {draftCount > 0 ? t("roundDraftSuffix", { n: draftCount }) : ""}
                 </small>
               </span>
+              <form action={deleteRoundAction} onClick={(e) => e.stopPropagation()}>
+                <input type="hidden" name="adminKey" value={adminKey} />
+                <input type="hidden" name="roundId" value={round.id} />
+                <button
+                  className="secondary small danger"
+                  disabled={usingDemoData}
+                  type="submit"
+                  title={t("step2DeleteRound")}
+                >
+                  ×
+                </button>
+              </form>
             </summary>
             <div className="round-card-body">
               {roundMatches.length > 0 ? (

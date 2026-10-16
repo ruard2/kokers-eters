@@ -490,6 +490,53 @@ export async function reopenRoundAction(formData: FormData) {
   }
 }
 
+export async function deleteRoundAction(formData: FormData) {
+  const admin = requireAdmin(formData);
+  const key = admin.key;
+  const roundId = text(formData, "roundId");
+
+  try {
+    const ownedRound = await prisma.matchRound.findFirst({
+      where: { id: roundId, organizationId: admin.organizationId },
+      select: { id: true }
+    });
+    if (!ownedRound) {
+      redirectAdmin(key, "Ronde niet gevonden.", { step: "planning" });
+    }
+
+    const activeCount = await prisma.mealMatch.count({
+      where: {
+        roundId,
+        round: { organizationId: admin.organizationId },
+        status: {
+          notIn: [MatchStatus.DRAFT, MatchStatus.CANCELLED]
+        }
+      }
+    });
+
+    if (activeCount > 0) {
+      redirectAdmin(key, "Deze ronde heeft al verstuurde matches en kan niet verwijderd worden. Gebruik 'Terugzetten naar concept' eerst.", { step: "planning" });
+    }
+
+    await prisma.$transaction([
+      prisma.mealMatch.deleteMany({
+        where: { roundId, round: { organizationId: admin.organizationId } }
+      }),
+      prisma.matchRound.delete({
+        where: { id: roundId }
+      })
+    ]);
+
+    redirectAdmin(key, "Ronde verwijderd.", { step: "planning" });
+  } catch (error) {
+    if (isRedirectError(error)) throw error;
+    if (databaseUnavailableNotice(error)) {
+      redirectAdmin(key, "Database niet bereikbaar.", { step: "planning" });
+    }
+    throw error;
+  }
+}
+
 export async function sendPreferenceChecksAction(formData: FormData) {
   const admin = requireAdmin(formData);
   const key = admin.key;

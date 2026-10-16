@@ -885,6 +885,22 @@ th {
   display: block;
 }
 
+.round-card summary form {
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+.danger,
+.button.danger {
+  background: #681930;
+  color: #fff;
+}
+
+.danger:hover,
+.button.danger:hover {
+  background: #4f1124;
+}
+
 .round-card summary small {
   color: var(--muted);
   font-size: 12px;

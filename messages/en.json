@@ -230,6 +230,7 @@
     "step2MatchesHint": "Drag a host or guest to another row to swap. Green means possible, red means not. Set permanent blocks in the sheet under No match.",
     "step2SheetBtn": "Sign-up sheet",
     "step2BackToDraft": "Revert to draft",
+    "step2DeleteRound": "Delete round",
     "step2ApproveBtn": "Approve + send emails",
     "step3Eyebrow": "Step 3",
     "step3Title": "Prepare emails",
