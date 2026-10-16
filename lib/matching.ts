@@ -330,6 +330,14 @@ export async function generateRoundForMonth(
       return partySizeDifference;
     }
 
+    // EAT-only requests before BOTH requests (same party size): ensures HOST-only hosts
+    // get eaters from EAT-only people first, so BOTH people's ETER requests can be skipped
+    const aModeOrder = a.eater.mode === ParticipationMode.EAT ? 0 : 1;
+    const bModeOrder = b.eater.mode === ParticipationMode.EAT ? 0 : 1;
+    if (aModeOrder !== bModeOrder) {
+      return aModeOrder - bModeOrder;
+    }
+
     const roleDifference =
       rolePreferenceScore(a.eater, "EATER", roleHistory) - rolePreferenceScore(b.eater, "EATER", roleHistory);
     if (roleDifference !== 0) {
@@ -387,9 +395,10 @@ export async function generateRoundForMonth(
         pass.allowPreviousConnection && priorPairs.has(pairKey(a.host.id, request.eater.id)) ? 500 : 0;
       const bRepeatPenalty =
         pass.allowPreviousConnection && priorPairs.has(pairKey(b.host.id, request.eater.id)) ? 500 : 0;
-      // Mild bonus for BOTH-mode hosts who have no assignment yet — keeps them in the running
-      const aUnusedBothBonus = (a.host.mode === ParticipationMode.BOTH && !currentRoles.has(a.host.id)) ? -15 : 0;
-      const bUnusedBothBonus = (b.host.mode === ParticipationMode.BOTH && !currentRoles.has(b.host.id)) ? -15 : 0;
+      // HOST-only hosts who have no eaters yet get a bonus — they depend entirely on getting
+      // eaters to participate (can't fall back to ETER role), so they should be filled first
+      const aHostOnlyBonus = (a.host.mode === ParticipationMode.HOST && !currentRoles.has(a.host.id)) ? -15 : 0;
+      const bHostOnlyBonus = (b.host.mode === ParticipationMode.HOST && !currentRoles.has(b.host.id)) ? -15 : 0;
       const aScore =
         rolePreferenceScore(a.host, "HOST", roleHistory) +
         a.hostedCount * 20 +
@@ -397,7 +406,7 @@ export async function generateRoundForMonth(
         (a.remainingCapacity - request.partySize) * 2 +
         aRepeatPenalty +
         (connectionHistory.get(aConnectionKey) || 0) * 250 +
-        aUnusedBothBonus;
+        aHostOnlyBonus;
       const bScore =
         rolePreferenceScore(b.host, "HOST", roleHistory) +
         b.hostedCount * 20 +
@@ -405,7 +414,7 @@ export async function generateRoundForMonth(
         (b.remainingCapacity - request.partySize) * 2 +
         bRepeatPenalty +
         (connectionHistory.get(bConnectionKey) || 0) * 250 +
-        bUnusedBothBonus;
+        bHostOnlyBonus;
       return aScore - bScore;
     })[0];
 
