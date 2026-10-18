@@ -21,6 +21,7 @@ import { demoSeedEnabled, resolveAdminContext } from "@/lib/admin";
 import { addMonths, displayDate, displayMonth, jsonDateList, monthInputValue, parseMonthInput, toMonthStart } from "@/lib/dates";
 import { demoAdminData } from "@/lib/demo-data";
 import { prisma } from "@/lib/db";
+import { findUnplaced, type UnplacedParticipant } from "@/lib/matching";
 import { adminMailTemplateDefinitions } from "@/lib/mail-templates";
 import { appUrl } from "@/lib/urls";
 import { defaultPlanningSettings, type PlanningSettingsView } from "@/lib/planning";
@@ -106,7 +107,10 @@ function planningSettingsView(settings: PlanningSettings | null): PlanningSettin
         hostMailDaysBefore: settings.hostMailDaysBefore,
         eaterMailDelayDays: settings.eaterMailDelayDays,
         reminderDaysAfter: settings.reminderDaysAfter,
-        renewalCadence: settings.renewalCadence
+        renewalCadence: settings.renewalCadence,
+        startMonth: settings.startMonth,
+        bothDoubleRole: settings.bothDoubleRole,
+        singlesAlone: settings.singlesAlone
       }
     : defaultPlanningSettings;
 }
@@ -401,6 +405,7 @@ function RoundsAccordion({
   matches,
   participants,
   rounds,
+  unplacedByRound,
   usingDemoData,
   t
 }: {
@@ -408,6 +413,7 @@ function RoundsAccordion({
   matches: MatchWithPeople[];
   participants: Participant[];
   rounds: RoundWithMatches[];
+  unplacedByRound: Map<string, UnplacedParticipant[]>;
   usingDemoData: boolean;
   t: T;
 }) {
@@ -432,6 +438,7 @@ function RoundsAccordion({
         );
         const draftCount = roundMatches.filter((match) => match.status === "DRAFT").length;
         const matchCount = roundMatches.length || round.matches.length;
+        const unplaced = unplacedByRound.get(round.id) || [];
 
         return (
           <details className="round-card" key={round.id}>
@@ -441,6 +448,7 @@ function RoundsAccordion({
                 <small>
                   {statusLabel(round.status, t)} - {t("roundConnections", { n: matchCount })}
                   {draftCount > 0 ? t("roundDraftSuffix", { n: draftCount }) : ""}
+                  {unplaced.length > 0 ? ` - ${unplaced.length} niet geplaatst` : ""}
                 </small>
               </span>
               <form action={deleteRoundAction}>
@@ -489,10 +497,38 @@ function RoundsAccordion({
                   />
                 </div>
               ) : null}
+              {unplaced.length > 0 ? <UnplacedList unplaced={unplaced} /> : null}
             </div>
           </details>
         );
       })}
+    </div>
+  );
+}
+
+function partyLabel(size: number) {
+  return size > 1 ? `${size} personen` : "single";
+}
+
+function UnplacedList({ unplaced }: { unplaced: UnplacedParticipant[] }) {
+  return (
+    <div className="unplaced-panel">
+      <strong>Niet geplaatst ({unplaced.length})</strong>
+      <p className="compact-muted">
+        Deze deelnemers zitten niet (of te weinig) in deze ronde. Er was geen passend adres meer vrij. Koppel ze hierboven handmatig of genereer opnieuw.
+      </p>
+      <ul>
+        {unplaced.map(({ participant, needed, got }) => (
+          <li key={participant.id}>
+            <span>{participant.name}</span>
+            <small>
+              {partyLabel(Math.max(1, participant.comingWithCount))}
+              {participant.mode === "BOTH" ? " - allebei" : ""}
+              {needed > 1 ? ` - ${got} van ${needed} keer geplaatst` : ""}
+            </small>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -585,6 +621,7 @@ function StepTwo({
   participants,
   planningSettings,
   rounds,
+  unplacedByRound,
   showSheet,
   usingDemoData,
   t
@@ -595,13 +632,14 @@ function StepTwo({
   participants: Participant[];
   planningSettings: PlanningSettingsView;
   rounds: RoundWithMatches[];
+  unplacedByRound: Map<string, UnplacedParticipant[]>;
   showSheet: boolean;
   usingDemoData: boolean;
   t: T;
 }) {
   return (
     <StepShell closeHref={adminHref(adminKey)} eyebrow={t("step2Eyebrow")} title={t("step2Title")} closeLabel={t("stepClose")}>
-      <form action={generatePlanningAction} className="planning-form" key={`planning-${planningSettings.horizonMonths}-${defaultMonth}`}>
+      <form action={generatePlanningAction} className="planning-form" key={`planning-${planningSettings.horizonMonths}-${defaultMonth}-${planningSettings.bothDoubleRole}-${planningSettings.singlesAlone}`}>
         <input type="hidden" name="adminKey" value={adminKey} />
         <input type="hidden" name="adminCheckDaysBefore" value={planningSettings.adminCheckDaysBefore} />
         <input type="hidden" name="hostMailDaysBefore" value={planningSettings.hostMailDaysBefore} />
@@ -624,11 +662,11 @@ function StepTwo({
         </label>
         <div className="planning-form-extra">
           <label className="check-row">
-            <input name="bothDoubleRole" type="checkbox" value="1" />
+            <input defaultChecked={planningSettings.bothDoubleRole} name="bothDoubleRole" type="checkbox" value="1" />
             Beide rollen: &lsquo;allebei&rsquo;-deelnemers eten én koken deze ronde
           </label>
           <label className="check-row">
-            <input name="singlesAlone" type="checkbox" value="1" />
+            <input defaultChecked={planningSettings.singlesAlone} name="singlesAlone" type="checkbox" value="1" />
             Geen combinaties per adres (iedereen apart, ook singles)
           </label>
         </div>
@@ -642,7 +680,7 @@ function StepTwo({
           <h2>{t("step2RoundsTitle")}</h2>
           <span className="section-hint">{t("step2RoundsHint")}</span>
         </div>
-        <RoundsAccordion adminKey={adminKey} matches={matches} participants={participants} rounds={rounds} usingDemoData={usingDemoData} t={t} />
+        <RoundsAccordion adminKey={adminKey} matches={matches} participants={participants} rounds={rounds} unplacedByRound={unplacedByRound} usingDemoData={usingDemoData} t={t} />
       </div>
 
       {showSheet ? (
@@ -734,6 +772,7 @@ function StepFive({
   participants,
   planningSettings,
   rounds,
+  unplacedByRound,
   usingDemoData,
   t
 }: {
@@ -744,6 +783,7 @@ function StepFive({
   participants: Participant[];
   planningSettings: PlanningSettingsView;
   rounds: RoundWithMatches[];
+  unplacedByRound: Map<string, UnplacedParticipant[]>;
   usingDemoData: boolean;
   t: T;
 }) {
@@ -816,7 +856,7 @@ function StepFive({
         <div className="section-header">
           <h2>{t("step4PlanTitle")}</h2>
         </div>
-        <RoundsAccordion adminKey={adminKey} matches={matches} participants={participants} rounds={rounds} usingDemoData={usingDemoData} t={t} />
+        <RoundsAccordion adminKey={adminKey} matches={matches} participants={participants} rounds={rounds} unplacedByRound={unplacedByRound} usingDemoData={usingDemoData} t={t} />
       </div>
 
       <div className="nested-panel worksheet-panel">
@@ -905,6 +945,8 @@ export default async function AdminPage({ searchParams }: PageProps) {
   let emailLogs: EmailLog[];
   let planningSettings = defaultPlanningSettings;
   let mailTemplates: MailTemplate[] = [];
+  let optOuts: Array<{ participantId: string; month: Date }> = [];
+  let roleOverrides: Array<{ participantId: string; month: Date; forceMode: Participant["mode"] }> = [];
 
   if (isDemoMode) {
     const demo = demoAdminData();
@@ -913,7 +955,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
     matches = demo.matches as unknown as MatchWithPeople[];
     emailLogs = demo.emailLogs as unknown as EmailLog[];
   } else try {
-    const [participantRows, roundRows, matchRows, emailLogRows, settingsRow, templateRows] = await Promise.all([
+    const [participantRows, roundRows, matchRows, emailLogRows, settingsRow, templateRows, optOutRows, overrideRows] = await Promise.all([
       prisma.participant.findMany({ where: { organizationId }, orderBy: { createdAt: "asc" }, take: 120 }),
       prisma.matchRound.findMany({ where: { organizationId }, orderBy: { month: "asc" }, take: 36, include: { matches: true } }),
       prisma.mealMatch.findMany({ where: { round: { organizationId } }, orderBy: { createdAt: "desc" }, take: 120, include: { host: true, eater: true, round: true } }),
@@ -925,8 +967,12 @@ export default async function AdminPage({ searchParams }: PageProps) {
         take: 30
       }),
       prisma.planningSettings.findFirst({ where: { organizationId } }),
-      prisma.mailTemplate.findMany({ where: { organizationId }, orderBy: { type: "asc" } })
+      prisma.mailTemplate.findMany({ where: { organizationId }, orderBy: { type: "asc" } }),
+      prisma.roundOptOut.findMany({ where: { participant: { organizationId } }, select: { participantId: true, month: true } }),
+      prisma.roundRoleOverride.findMany({ where: { organizationId }, select: { participantId: true, month: true, forceMode: true } })
     ]);
+    optOuts = optOutRows;
+    roleOverrides = overrideRows;
     participants = participantRows;
     rounds = roundRows;
     matches = matchRows;
@@ -946,11 +992,33 @@ export default async function AdminPage({ searchParams }: PageProps) {
     ? appUrl(`/aanmelden?organization=${encodeURIComponent(organizationId)}`)
     : appUrl("/aanmelden");
   const queryStartMonth = first(query.startMonth);
+  const savedStartMonth = planningSettings.startMonth;
   const defaultMonth =
-    queryStartMonth && /^\d{4}-\d{2}$/.test(queryStartMonth) ? queryStartMonth : monthInputValue(toMonthStart(new Date()));
+    queryStartMonth && /^\d{4}-\d{2}$/.test(queryStartMonth)
+      ? queryStartMonth
+      : savedStartMonth && /^\d{4}-\d{2}$/.test(savedStartMonth)
+        ? savedStartMonth
+        : monthInputValue(toMonthStart(new Date()));
   const planningStart = parseMonthInput(defaultMonth);
   const planningEnd = addMonths(planningStart, planningSettings.horizonMonths);
   const planningRounds = rounds.filter((round) => round.month >= planningStart && round.month < planningEnd);
+
+  // Per round: who should have been in it but has no (or too few) matches.
+  // Uses the live matches, so manual changes on the board are reflected too.
+  const unplacedByRound = new Map<string, UnplacedParticipant[]>();
+  for (const round of rounds) {
+    const monthTime = round.month.getTime();
+    const optedOut = new Set(optOuts.filter((o) => o.month.getTime() === monthTime).map((o) => o.participantId));
+    const forced = new Map(
+      roleOverrides.filter((o) => o.month.getTime() === monthTime).map((o) => [o.participantId, o.forceMode] as const)
+    );
+    const eligible = participants.filter((p) => p.active && !optedOut.has(p.id));
+    const roundMatches = round.matches.filter((m) => m.status !== "CANCELLED");
+    unplacedByRound.set(
+      round.id,
+      findUnplaced(eligible, roundMatches, round.month, forced, planningSettings.bothDoubleRole)
+    );
+  }
 
 
   return (
@@ -981,13 +1049,13 @@ export default async function AdminPage({ searchParams }: PageProps) {
         <StepOne adminKey={key} participants={participants} showSheet={showSheet} signupUrl={signupUrl} usingDemoData={usingDemoData} t={t} />
       ) : null}
       {currentStep === "planning" ? (
-        <StepTwo adminKey={key} defaultMonth={defaultMonth} matches={matches} participants={participants} planningSettings={planningSettings} rounds={planningRounds} showSheet={showSheet} usingDemoData={usingDemoData} t={t} />
+        <StepTwo adminKey={key} defaultMonth={defaultMonth} matches={matches} participants={participants} planningSettings={planningSettings} rounds={planningRounds} unplacedByRound={unplacedByRound} showSheet={showSheet} usingDemoData={usingDemoData} t={t} />
       ) : null}
       {currentStep === "mails" ? (
         <StepFour adminKey={key} emailLogs={emailLogs} mailTemplates={mailTemplates} usingDemoData={usingDemoData} t={t} tm={tm} />
       ) : null}
       {currentStep === "summary" ? (
-        <StepFive adminKey={key} defaultMonth={defaultMonth} emailLogs={emailLogs} matches={matches} participants={participants} planningSettings={planningSettings} rounds={rounds} usingDemoData={usingDemoData} t={t} />
+        <StepFive adminKey={key} defaultMonth={defaultMonth} emailLogs={emailLogs} matches={matches} participants={participants} planningSettings={planningSettings} rounds={rounds} unplacedByRound={unplacedByRound} usingDemoData={usingDemoData} t={t} />
       ) : null}
     </div>
   );

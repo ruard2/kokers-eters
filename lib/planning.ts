@@ -5,6 +5,9 @@ export type PlanningSettingsView = {
   eaterMailDelayDays: number;
   reminderDaysAfter: number;
   renewalCadence: string;
+  startMonth: string | null;
+  bothDoubleRole: boolean;
+  singlesAlone: boolean;
 };
 
 export const defaultPlanningSettings: PlanningSettingsView = {
@@ -13,7 +16,10 @@ export const defaultPlanningSettings: PlanningSettingsView = {
   hostMailDaysBefore: 21,
   eaterMailDelayDays: 3,
   reminderDaysAfter: 3,
-  renewalCadence: "YEAR"
+  renewalCadence: "YEAR",
+  startMonth: null,
+  bothDoubleRole: false,
+  singlesAlone: false
 };
 
 export function clampInt(value: FormDataEntryValue | null, fallback: number, min: number, max: number) {

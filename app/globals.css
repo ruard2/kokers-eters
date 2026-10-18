@@ -1855,3 +1855,36 @@ th {
   text-decoration: underline;
 }
 
+
+/* Niet-geplaatste deelnemers, altijd onderaan een ronde */
+.unplaced-panel {
+  background: var(--warning);
+  border: 1px solid #ead38c;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+}
+
+.unplaced-panel p {
+  margin: 0;
+}
+
+.unplaced-panel ul {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.unplaced-panel li {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.unplaced-panel li small {
+  color: var(--muted);
+}

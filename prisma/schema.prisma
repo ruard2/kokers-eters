@@ -136,6 +136,10 @@ model PlanningSettings {
   eaterMailDelayDays   Int      @default(3)
   reminderDaysAfter    Int      @default(3)
   renewalCadence       String   @default("YEAR")
+  // Last used setup of step 2, so it is still there when you come back to the step
+  startMonth           String?
+  bothDoubleRole       Boolean  @default(false)
+  singlesAlone         Boolean  @default(false)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

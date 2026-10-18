@@ -331,7 +331,10 @@ export async function generatePlanningAction(formData: FormData) {
     hostMailDaysBefore: clampInt(formData.get("hostMailDaysBefore"), 21, 1, 120),
     eaterMailDelayDays: clampInt(formData.get("eaterMailDelayDays"), 3, 1, 30),
     reminderDaysAfter: clampInt(formData.get("reminderDaysAfter"), 3, 1, 30),
-    renewalCadence: normalizeRenewalCadence(formData.get("renewalCadence"))
+    renewalCadence: normalizeRenewalCadence(formData.get("renewalCadence")),
+    startMonth: monthInputValue(startMonth),
+    bothDoubleRole,
+    singlesAlone
   };
 
   try {
@@ -362,6 +365,7 @@ export async function generatePlanningAction(formData: FormData) {
 
     let matched = 0;
     let requested = 0;
+    let unplaced = 0;
     let skipped = 0;
     for (const plannedMonth of plannedMonths) {
       try {
@@ -373,6 +377,7 @@ export async function generatePlanningAction(formData: FormData) {
         );
         matched += result.matched;
         requested += result.requested;
+        unplaced += result.unplaced;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (message.includes("al verstuurd")) {
@@ -386,7 +391,7 @@ export async function generatePlanningAction(formData: FormData) {
 
     redirectAdmin(
       key,
-      `${horizonMonths - skipped} ronde(s) klaargezet: ${matched} matches voor ${requested} eetverzoeken.${cleanup.count ? ` ${cleanup.count} oude conceptronde(s) verwijderd.` : ""}${skipped ? ` ${skipped} bestaande verstuurde ronde(s) overgeslagen.` : ""}`,
+      `${horizonMonths - skipped} ronde(s) klaargezet: ${matched} matches voor ${requested} eetverzoeken.${unplaced ? ` Let op: ${unplaced} deelnemer(s) niet geplaatst, zie onderaan de ronde.` : ""}${cleanup.count ? ` ${cleanup.count} oude conceptronde(s) verwijderd.` : ""}${skipped ? ` ${skipped} bestaande verstuurde ronde(s) overgeslagen.` : ""}`,
       { step: "planning", startMonth: monthInputValue(startMonth) }
     );
   } catch (error) {

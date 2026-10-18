@@ -220,17 +220,17 @@ export function demoAdminData() {
     emailLogs: [
       {
         id: "demo-mail-1",
-        type: "HOST_INVITE",
+        type: "MATCH_HOST",
         toEmail: anna.email,
         status: "DEMO",
-        subject: "Eters & Kokers: kun je dagen kiezen voor Emma en Joost?"
+        subject: "Eters & Kokers: je mag gaan koken"
       },
       {
         id: "demo-mail-2",
-        type: "EATER_CHOICE",
+        type: "MATCH_EATER",
         toEmail: emmaJoost.email,
         status: "DEMO",
-        subject: "Eters & Kokers: kies een dag bij Anna de Vries"
+        subject: "Eters & Kokers: je bent gekoppeld aan Anna de Vries"
       }
     ]
   };

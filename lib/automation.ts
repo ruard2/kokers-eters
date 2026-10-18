@@ -1,7 +1,7 @@
 import { MatchStatus, RoundStatus } from "@prisma/client";
 import { addDays, addMonths, toMonthStart } from "./dates";
 import { prisma } from "./db";
-import { sendEaterIntro, sendHostInvite, sendPreferenceCheck, sendSimpleHost, sendSimpleEater } from "./mailer";
+import { sendMatchEaterMail, sendMatchHostMail, sendPreferenceCheck } from "./mailer";
 import { generateRoundForMonth } from "./matching";
 
 const matchInclude = {
@@ -36,6 +36,13 @@ export async function sendPreferenceChecksForMonth(
   return sent;
 }
 
+// A mail counts as handled when it went out, was already sent before, or the
+// template is switched off. "No provider" and errors keep the match in DRAFT
+// so it can be retried later.
+function mailHandled(result: { status: string }) {
+  return result.status === "sent" || result.status === "skipped_existing" || result.status === "skipped_disabled";
+}
+
 export async function sendHostInvitesForRound(
   roundId?: string,
   organizationId: string | null = null
@@ -50,48 +57,38 @@ export async function sendHostInvitesForRound(
     orderBy: { createdAt: "asc" }
   });
 
-  let sent = 0;
+  // One mail per koker per ronde, listing every eater coupled to them in that round.
+  const byHost = new Map<string, typeof matches>();
   for (const match of matches) {
-    // Try EATER_INTRO (simple flow: eater gets host info and contacts host themselves)
-    let eaterIntroResult: { status: string } = { status: "skipped_disabled" };
+    const key = `${match.roundId}:${match.hostId}`;
+    const group = byHost.get(key) || [];
+    group.push(match);
+    byHost.set(key, group);
+  }
+
+  const hostOk = new Map<string, boolean>();
+  for (const [key, group] of byHost) {
+    let result: { status: string } = { status: "error" };
     try {
-      eaterIntroResult = await sendEaterIntro(match);
+      result = await sendMatchHostMail(group[0].host, group[0].round, group);
     } catch (error) {
-      console.error(`[mail error] eater intro for match ${match.id}:`, error);
+      console.error(`[mail error] koppelingsmail koker ${key}:`, error);
+    }
+    hostOk.set(key, mailHandled(result));
+  }
+
+  // One mail per eater per koppeling.
+  let sent = 0;
+  const touchedRounds = new Set<string>();
+  for (const match of matches) {
+    let result: { status: string } = { status: "error" };
+    try {
+      result = await sendMatchEaterMail(match);
+    } catch (error) {
+      console.error(`[mail error] koppelingsmail eter ${match.id}:`, error);
     }
 
-    // Try HOST_INVITE (complex flow: host picks dates via form) — only if configured
-    let hostInviteResult: { status: string } = { status: "skipped_disabled" };
-    try {
-      hostInviteResult = await sendHostInvite(match);
-    } catch (error) {
-      console.error(`[mail error] host invite for match ${match.id}:`, error);
-    }
-
-    // Try SIMPLE_HOST (simple flow: host gets eater info and contacts them directly)
-    let simpleHostResult: { status: string } = { status: "skipped_disabled" };
-    try {
-      simpleHostResult = await sendSimpleHost(match);
-    } catch (error) {
-      console.error(`[mail error] simple host for match ${match.id}:`, error);
-    }
-
-    // Try SIMPLE_EATER (simple flow: eater told host will contact them)
-    let simpleEaterResult: { status: string } = { status: "skipped_disabled" };
-    try {
-      simpleEaterResult = await sendSimpleEater(match);
-    } catch (error) {
-      console.error(`[mail error] simple eater for match ${match.id}:`, error);
-    }
-
-    const anySent = [eaterIntroResult, hostInviteResult, simpleHostResult, simpleEaterResult]
-      .some((r) => r.status === "sent" || r.status === "skipped_existing");
-
-    // If all disabled (no templates on), still advance — match exists, just no mail.
-    const bothDisabled = [eaterIntroResult, hostInviteResult, simpleHostResult, simpleEaterResult]
-      .every((r) => r.status === "skipped_disabled");
-
-    if (!anySent && !bothDisabled) {
+    if (!mailHandled(result) || !hostOk.get(`${match.roundId}:${match.hostId}`)) {
       continue;
     }
 
@@ -102,14 +99,19 @@ export async function sendHostInvitesForRound(
         hostInvitedAt: new Date()
       }
     });
+    touchedRounds.add(match.roundId);
     sent += 1;
   }
 
-  if (roundId && sent > 0) {
-    await prisma.matchRound.updateMany({
-      where: { id: roundId, organizationId },
-      data: { status: RoundStatus.HOST_MAILS_SENT }
-    });
+  // A round is "sent" once none of its matches is still waiting in DRAFT.
+  for (const id of touchedRounds) {
+    const remaining = await prisma.mealMatch.count({ where: { roundId: id, status: MatchStatus.DRAFT } });
+    if (remaining === 0) {
+      await prisma.matchRound.updateMany({
+        where: { id, organizationId },
+        data: { status: RoundStatus.HOST_MAILS_SENT }
+      });
+    }
   }
 
   return sent;

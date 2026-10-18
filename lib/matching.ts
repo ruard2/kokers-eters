@@ -454,14 +454,17 @@ export async function generateRoundForMonth(
   }
 
   // Rescue: last-resort fallback for unplaced eaters.
-  // Combining rules are relaxed here — the only hard limit is max 2 eaters per address.
+  // Combining rules are relaxed here so nobody silently drops out:
+  // - hard limit: max 2 parties per address
+  // - a single may join an address with a couple/family (and vice versa)
+  // - two couples/families are never combined
   for (const req of remainingEatRequests) {
     const candidates = hostBuckets.filter((b) => {
       const key = pairKey(b.host.id, req.eater.id);
       const existingAtBucket = assignments.filter((a) => a.hostId === b.host.id);
       if (existingAtBucket.length >= 2) return false;
       const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
-      if (bucketHasFamily || (req.partySize > 1 && existingAtBucket.length > 0)) return false;
+      if (req.partySize > 1 && bucketHasFamily) return false;
       return (
         b.host.id !== req.eater.id &&
         b.remainingCapacity >= req.partySize &&
@@ -585,7 +588,33 @@ export async function generateRoundForMonth(
       }
       if (uncoveredBoth.every((p) => covered.has(p.id))) break;
     }
+
+    // Pass C: last resort for BOTH people — same relaxed rules as the Phase 1 rescue.
+    for (const person of uncoveredBoth) {
+      if (covered.has(person.id)) continue;
+      const pSize = Math.max(1, person.comingWithCount ?? 1);
+      const candidates = shuffle(
+        hostBuckets.filter((b) => {
+          const existingAtBucket = assignments.filter((a) => a.hostId === b.host.id);
+          if (existingAtBucket.length >= 2) return false;
+          if (pSize > 1 && existingAtBucket.some((a) => a.partySize > 1)) return false;
+          return (
+            b.host.id !== person.id &&
+            b.remainingCapacity >= pSize &&
+            compatibleMatch(b.host, person) &&
+            !adminBlocksMatch(b.host, person, adminNoMatch) &&
+            !currentPairs.has(pairKey(b.host.id, person.id))
+          );
+        })
+      ).sort((a, b) => a.remainingCapacity - b.remainingCapacity);
+      if (candidates.length > 0) {
+        makeAssignment(candidates[0], person, pSize);
+        covered.add(person.id);
+      }
+    }
   }
+
+  const unplaced = findUnplaced(participants, assignments, month, forcedMode, bothDoubleRole);
 
   if (assignments.length > 0) {
     await prisma.mealMatch.createMany({ data: assignments });
@@ -596,6 +625,63 @@ export async function generateRoundForMonth(
     month,
     matched: assignments.length,
     requested: eatOnlyRequests.length + bothActive.length,
-    hosts: hostBuckets.length
+    hosts: hostBuckets.length,
+    unplaced: unplaced.length
   };
+}
+
+export type UnplacedParticipant = {
+  participant: Participant;
+  needed: number;
+  got: number;
+};
+
+/**
+ * Who should have been in this round but has no (or too few) matches.
+ * - EAT-mode (or BOTH forced to EAT, or BOTH with the double-role option):
+ *   needs as many eater matches as their eating frequency asks for.
+ * - BOTH-mode otherwise: needs to be in at least one match (host or eater).
+ * HOST-only people are never listed: a host without guests is not "dropped".
+ * `participants` must already exclude inactive and opted-out people.
+ */
+export function findUnplaced(
+  participants: Participant[],
+  matches: Array<{ hostId: string; eaterId: string }>,
+  month: Date,
+  forcedMode: Map<string, ParticipationMode>,
+  bothDoubleRole: boolean
+): UnplacedParticipant[] {
+  const eaterCount = new Map<string, number>();
+  const anyRole = new Set<string>();
+  for (const match of matches) {
+    eaterCount.set(match.eaterId, (eaterCount.get(match.eaterId) || 0) + 1);
+    anyRole.add(match.eaterId);
+    anyRole.add(match.hostId);
+  }
+
+  const result: UnplacedParticipant[] = [];
+  for (const participant of participants) {
+    const effective = forcedMode.get(participant.id) ?? participant.mode;
+    if (effective === ParticipationMode.HOST) continue;
+
+    const eatCount = desiredCount(participant.eaterFrequency, participant.createdAt, month);
+    const mustEat =
+      effective === ParticipationMode.EAT || (bothDoubleRole && effective === ParticipationMode.BOTH);
+
+    if (mustEat) {
+      const got = eaterCount.get(participant.id) || 0;
+      if (eatCount > 0 && got < eatCount) {
+        result.push({ participant, needed: eatCount, got });
+      }
+      continue;
+    }
+
+    // BOTH without double role: one role in this round is enough
+    const hostCount = desiredCount(participant.hostFrequency, participant.createdAt, month);
+    if ((eatCount > 0 || hostCount > 0) && !anyRole.has(participant.id)) {
+      result.push({ participant, needed: 1, got: 0 });
+    }
+  }
+
+  return result.sort((a, b) => a.participant.name.localeCompare(b.participant.name, "nl"));
 }

@@ -3,15 +3,13 @@ import { prisma } from "./db";
 export type MailTemplateType =
   | "WELCOME"
   | "PREFERENCE_CHECK"
-  | "EATER_INTRO"
-  | "HOST_INVITE"
+  | "MATCH_HOST"
+  | "MATCH_EATER"
   | "EATER_CHOICE"
   | "CONFIRMATION_HOST"
   | "CONFIRMATION_EATER"
   | "FALLBACK_HOST"
-  | "FALLBACK_EATER"
-  | "SIMPLE_HOST"
-  | "SIMPLE_EATER";
+  | "FALLBACK_EATER";
 
 export type MailTemplateDefinition = {
   type: MailTemplateType;
@@ -64,51 +62,57 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
     defaultEnabled: false
   },
   {
-    // Standaard-mail: eter krijgt direct de contactgegevens van de host en spreekt
-    // zelf een datum af. Simpelste flow — geen date-picking formulieren nodig.
-    type: "EATER_INTRO",
-    label: "Koppeling naar eter",
-    description: "Naar de eter na goedkeuring van de matches. Stuur dit als je wilt dat de eter zelf contact opneemt met de koker.",
-    title: "Je bent gekoppeld voor {{month}}",
-    subject: "Eters & Kokers: je bent gekoppeld voor {{month}}",
+    // De enige koppelingsmail naar de koker: één mail per koker per ronde,
+    // met alle eters die aan hem/haar gekoppeld zijn.
+    type: "MATCH_HOST",
+    label: "Koppelingsmail koker",
+    description: "Eén mail naar elke koker na goedkeuring, met alle eters die aan hem of haar gekoppeld zijn.",
+    title: "Je mag gaan koken!",
+    subject: "Eters & Kokers: je mag gaan koken",
     body: [
-      "Hoi {{eaterName}},",
+      "Goedendag {{hostName}},",
       "",
-      "Fijn dat je meedoet — voor {{month}} ben je gekoppeld aan {{hostName}}!",
+      "Wat leuk dat je meedoet! Je mag deze keer koken voor:",
       "",
-      "{{hostName}} neemt binnenkort contact met je op om een datum af te spreken. Je mag ook zelf het initiatief nemen:",
-      "E-mail: {{hostEmail}}",
-      "WhatsApp/telefoon: {{hostWhatsapp}}",
-      "Adres: {{address}}",
+      "{{eaterList}}",
       "",
-      "Jouw allergieen of dieetwensen doorgegeven: {{allergies}}",
+      "{{multipleNote}}",
       "",
-      "Veel plezier samen — geniet van de maaltijd!"
+      "{{eaterNames}} {{knowVerb}} van deze koppeling en {{contactVerb}} contact met je op om samen af te spreken wat, wanneer en hoe.",
+      "",
+      "Veel plezier met elkaar!",
+      "",
+      "Hartelijke groeten,",
+      "Het Eters & Kokers-team"
     ].join("\n"),
     adminVisible: true,
     defaultEnabled: true
   },
   {
-    type: "HOST_INVITE",
-    label: "Host kiest dagen (formulier)",
-    description: "Naar de koker — stuurt hen naar een formulier om beschikbare dagen te kiezen. Zet aan als je het datum-kiesformulier wilt gebruiken in plaats van de simpele koppelingsmail.",
-    title: "Je bent gekoppeld als host",
-    subject: "Eters & Kokers: je bent gekoppeld voor {{month}}",
+    // De enige koppelingsmail naar de eter: één mail per koppeling.
+    type: "MATCH_EATER",
+    label: "Koppelingsmail eter",
+    description: "Eén mail naar elke eter na goedkeuring, met de gegevens van de koker.",
+    title: "Je bent gekoppeld!",
+    subject: "Eters & Kokers: je bent gekoppeld aan {{hostName}}",
     body: [
-      "Hoi {{hostName}},",
+      "Beste {{eaterName}},",
       "",
-      "Leuk dat je meedoet als koker — voor {{month}} ben je gekoppeld aan {{eaterName}} ({{partySize}} persoon/personen)!",
+      "Geweldig dat je meedoet! Je bent gekoppeld aan {{hostName}}.",
       "",
-      "Neem contact op om een datum af te spreken:",
-      "E-mail: {{eaterEmail}}",
-      "WhatsApp/telefoon: {{eaterWhatsapp}}",
+      "E-mail: {{hostEmail}}",
+      "Telefoon/WhatsApp: {{hostWhatsapp}}",
+      "Adres: {{address}}",
       "",
-      "Allergieen of dieetwensen: {{allergies}}",
+      "Wil jij contact opnemen met {{hostName}} om samen af te spreken wat, wanneer en hoe?",
       "",
-      "Veel plezier samen — geniet van de maaltijd!"
+      "Veel plezier met elkaar!",
+      "",
+      "Hartelijke groeten,",
+      "Het Eters & Kokers-team"
     ].join("\n"),
     adminVisible: true,
-    defaultEnabled: false
+    defaultEnabled: true
   },
   {
     type: "EATER_CHOICE",
@@ -138,7 +142,7 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "",
       "Je mag ook rechtstreeks contact opnemen als dat sneller is."
     ].join("\n"),
-    adminVisible: true,
+    adminVisible: false,
     defaultEnabled: false
   },
   {
@@ -166,7 +170,7 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "Allergieen of dieetwensen:",
       "{{allergies}}"
     ].join("\n"),
-    adminVisible: true,
+    adminVisible: false,
     defaultEnabled: false
   },
   {
@@ -194,7 +198,7 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "Allergieen of dieetwensen:",
       "{{allergies}}"
     ].join("\n"),
-    adminVisible: true,
+    adminVisible: false,
     defaultEnabled: false
   },
   {
@@ -223,62 +227,6 @@ export const mailTemplateDefinitions: MailTemplateDefinition[] = [
       "{{allergies}}"
     ].join("\n"),
     adminVisible: false,
-    defaultEnabled: false
-  },
-  {
-    // Simple match notification to the host — no form, host contacts eater directly.
-    type: "SIMPLE_HOST",
-    label: "Koppeling naar host",
-    description: "Naar de koker na goedkeuring: jij bent gekoppeld aan deze eter(s), neem contact op. Geen formulier nodig.",
-    title: "Je bent gekoppeld als koker voor {{month}}",
-    subject: "Eters & Kokers: je bent gekoppeld voor {{month}}",
-    body: [
-      "Hoi {{hostName}},",
-      "",
-      "Voor {{month}} ben je gekoppeld aan {{eaterName}} ({{partySize}} persoon/personen).",
-      "",
-      "Contactgegevens:",
-      "E-mail: {{eaterEmail}}",
-      "WhatsApp/telefoon: {{eaterWhatsapp}}",
-      "",
-      "Allergieen of dieetwensen: {{allergies}}",
-      "",
-      "{{cannotEatDaysText}}",
-      "",
-      "{{combinedNote}}",
-      "",
-      "Jullie spreken samen een datum af — aan jou om contact op te nemen! Via mail, WhatsApp of telefoon, wat voor jou het fijnst is.",
-      "",
-      "Fijne maaltijd alvast!"
-    ].join("\n"),
-    adminVisible: true,
-    defaultEnabled: false
-  },
-  {
-    // Simple match notification to the eater — host will contact them.
-    type: "SIMPLE_EATER",
-    label: "Koppeling naar eter (passief)",
-    description: "Naar de eter na goedkeuring: je gaat eten bij deze koker, zij nemen contact op. Gebruik samen met 'Koppeling naar host'.",
-    title: "Je bent gekoppeld als eter voor {{month}}",
-    subject: "Eters & Kokers: je gaat eten in {{month}}",
-    body: [
-      "Hoi {{eaterName}},",
-      "",
-      "Voor {{month}} ga je eten bij {{hostName}}!",
-      "",
-      "Jullie spreken samen een datum af. Neem gerust zelf contact op:",
-      "E-mail: {{hostEmail}}",
-      "WhatsApp/telefoon: {{hostWhatsapp}}",
-      "",
-      "Adres: {{address}}",
-      "",
-      "{{fellowEatersText}}",
-      "",
-      "Jouw allergieen of dieetwensen die zijn doorgegeven: {{allergies}}",
-      "",
-      "Geniet ervan!"
-    ].join("\n"),
-    adminVisible: true,
     defaultEnabled: false
   },
   {
@@ -338,6 +286,7 @@ function linkify(value: string) {
 export function plainTextToHtml(value: string) {
   return value
     .split(/\n{2,}/)
+    .filter((paragraph) => paragraph.trim().length > 0)
     .map((paragraph) => `<p>${linkify(escapeHtml(paragraph)).replaceAll("\n", "<br />")}</p>`)
     .join("");
 }
