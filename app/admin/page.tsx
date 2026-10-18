@@ -629,7 +629,7 @@ function StepTwo({
           </label>
           <label className="check-row">
             <input name="singlesAlone" type="checkbox" value="1" />
-            Elke single op een eigen adres (niet samenvoegen)
+            Geen combinaties per adres (iedereen apart, ook singles)
           </label>
         </div>
         <button disabled={usingDemoData} type="submit">{t("step2GenerateBtn")}</button>

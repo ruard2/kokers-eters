@@ -400,7 +400,7 @@ export async function generateRoundForMonth(
       const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
       if (existingAtBucket.length >= 2) return false;
       if (bucketHasFamily || (request.partySize > 1 && existingAtBucket.length > 0)) return false;
-      if (singlesAlone && request.partySize === 1 && existingAtBucket.length > 0) return false;
+      if (singlesAlone && existingAtBucket.length > 0) return false;
       return (
         bucket.host.id !== request.eater.id &&
         bucket.remainingCapacity >= request.partySize &&
@@ -511,6 +511,12 @@ export async function generateRoundForMonth(
             (b) => b.host.id === h.id && b.remainingCapacity >= pSize
           );
           if (!bucket) return false;
+          // Same sharing rules as Phase 1
+          const existingAtBucket = assignments.filter((a) => a.hostId === h.id);
+          const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
+          if (existingAtBucket.length >= 2) return false;
+          if (bucketHasFamily || (pSize > 1 && existingAtBucket.length > 0)) return false;
+          if (singlesAlone && existingAtBucket.length > 0) return false;
           if (!compatibleMatch(h, person)) return false;
           if (adminBlocksMatch(h, person, adminNoMatch)) return false;
           const conn = connectionKey(h.id, person.id);
@@ -550,7 +556,7 @@ export async function generateRoundForMonth(
               const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
               if (existingAtBucket.length >= 2) return false;
               if (bucketHasFamily || (pSize > 1 && existingAtBucket.length > 0)) return false;
-              if (singlesAlone && pSize === 1 && existingAtBucket.length > 0) return false;
+              if (singlesAlone && existingAtBucket.length > 0) return false;
               return (
                 b.host.id !== person.id &&
                 b.remainingCapacity >= pSize &&
