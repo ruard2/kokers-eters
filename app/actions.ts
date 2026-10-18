@@ -323,6 +323,7 @@ export async function generatePlanningAction(formData: FormData) {
   const key = admin.key;
   const startMonth = parseMonthInput(text(formData, "startMonth"));
   const horizonMonths = normalizeHorizon(formData.get("horizonMonths"));
+  const bothDoubleRole = formData.get("bothDoubleRole") === "1";
   const settings = {
     horizonMonths,
     adminCheckDaysBefore: clampInt(formData.get("adminCheckDaysBefore"), 14, 1, 90),
@@ -365,7 +366,8 @@ export async function generatePlanningAction(formData: FormData) {
       try {
         const result = await generateRoundForMonth(
           plannedMonth,
-          admin.organizationId
+          admin.organizationId,
+          bothDoubleRole
         );
         matched += result.matched;
         requested += result.requested;

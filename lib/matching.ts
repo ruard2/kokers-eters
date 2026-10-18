@@ -209,7 +209,8 @@ function addCurrentRole(currentRoles: Map<string, Set<Role>>, participantId: str
 
 export async function generateRoundForMonth(
   rawMonth: Date,
-  organizationId: string | null = null
+  organizationId: string | null = null,
+  bothDoubleRole = false
 ) {
   const month = toMonthStart(rawMonth);
   const existingRound = await prisma.matchRound.findFirst({
@@ -313,15 +314,17 @@ export async function generateRoundForMonth(
     }
   }
 
-  // ── Phase 1: EAT-only eater requests ────────────────────────────────────────
-  // Only EAT-mode participants generate mandatory eater requests. BOTH-mode
-  // participants are handled separately in Phase 2 so we never create more
-  // assignments than strictly needed for full participation.
-  // Exception: BOTH participants forced to EAT-only this round via role override.
+  // ── Phase 1: eater requests ──────────────────────────────────────────────────
+  // EAT-mode participants always generate mandatory eater requests.
+  // When bothDoubleRole is on, BOTH-mode participants also eat this round
+  // (they'll also host — two matches per BOTH-mode person).
   const eatOnlyRequests: EaterRequest[] = [];
   for (const participant of participants) {
     const effective = forcedMode.get(participant.id) ?? participant.mode;
-    if (effective !== ParticipationMode.EAT) continue;
+    const wantsToEat =
+      effective === ParticipationMode.EAT ||
+      (bothDoubleRole && effective === ParticipationMode.BOTH);
+    if (!wantsToEat) continue;
     const count = desiredCount(participant.eaterFrequency, participant.createdAt, month);
     for (let index = 0; index < count; index += 1) {
       eatOnlyRequests.push({
@@ -415,14 +418,20 @@ export async function generateRoundForMonth(
     return true;
   }
 
-  // 4-pass matching for EAT-only
-  // saveBothHostsForPhase2: true reserves BOTH-mode unused capacity for Phase 2 pairing
-  const passes: AssignmentPass[] = [
-    { allowPreviousConnection: false, allowDualRoleInRound: false, saveBothHostsForPhase2: true },
-    { allowPreviousConnection: false, allowDualRoleInRound: true,  saveBothHostsForPhase2: true },
-    { allowPreviousConnection: true,  allowDualRoleInRound: false, saveBothHostsForPhase2: true },
-    { allowPreviousConnection: true,  allowDualRoleInRound: true,  saveBothHostsForPhase2: true }
-  ];
+  // 4-pass matching for Phase 1 eater requests.
+  // When bothDoubleRole is on: BOTH-mode people eat AND host, so allow dual roles
+  // and don't reserve host capacity for Phase 2 (they're covered here already).
+  const passes: AssignmentPass[] = bothDoubleRole
+    ? [
+        { allowPreviousConnection: false, allowDualRoleInRound: true, saveBothHostsForPhase2: false },
+        { allowPreviousConnection: true,  allowDualRoleInRound: true, saveBothHostsForPhase2: false }
+      ]
+    : [
+        { allowPreviousConnection: false, allowDualRoleInRound: false, saveBothHostsForPhase2: true },
+        { allowPreviousConnection: false, allowDualRoleInRound: true,  saveBothHostsForPhase2: true },
+        { allowPreviousConnection: true,  allowDualRoleInRound: false, saveBothHostsForPhase2: true },
+        { allowPreviousConnection: true,  allowDualRoleInRound: true,  saveBothHostsForPhase2: true }
+      ];
 
   const sortedEatRequests = shuffle(eatOnlyRequests).sort((a, b) => {
     const diff = b.partySize - a.partySize;

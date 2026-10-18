@@ -8,7 +8,6 @@ import {
   deleteRoundAction,
   generatePlanningAction,
   reopenRoundAction,
-  saveRoleOverrideAction,
   seedDemoAction,
   saveAdminParticipantAction,
   saveMailTemplateAction,
@@ -579,56 +578,9 @@ function StepOne({
   );
 }
 
-function RoleOverrideSection({
-  adminKey,
-  bothParticipants,
-  defaultMonth,
-  existingOverrides,
-  usingDemoData
-}: {
-  adminKey: string;
-  bothParticipants: Participant[];
-  defaultMonth: string;
-  existingOverrides: { participantId: string; forceMode: string }[];
-  usingDemoData: boolean;
-}) {
-  if (bothParticipants.length === 0) return null;
-  const overrideMap = new Map(existingOverrides.map((o) => [o.participantId, o.forceMode]));
-
-  return (
-    <div className="nested-panel">
-      <div className="section-header">
-        <h2>Rol per ronde</h2>
-        <span className="section-hint">Kies voor mensen met &lsquo;allebei&rsquo; welke rol ze deze ronde spelen.</span>
-      </div>
-      <div className="role-override-list">
-        {bothParticipants.map((participant) => {
-          const currentForce = overrideMap.get(participant.id) ?? "BOTH";
-          return (
-            <form action={saveRoleOverrideAction} className="role-override-row" key={participant.id}>
-              <input type="hidden" name="adminKey" value={adminKey} />
-              <input type="hidden" name="participantId" value={participant.id} />
-              <input type="hidden" name="month" value={defaultMonth} />
-              <span className="role-override-name">{participant.name}</span>
-              <select defaultValue={currentForce} name="forceMode">
-                <option value="BOTH">Allebei</option>
-                <option value="HOST">Alleen koken</option>
-                <option value="EAT">Alleen eten</option>
-              </select>
-              <button className="small secondary" disabled={usingDemoData} type="submit">Opslaan</button>
-            </form>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function StepTwo({
   adminKey,
-  bothParticipants,
   defaultMonth,
-  existingOverrides,
   matches,
   participants,
   planningSettings,
@@ -638,9 +590,7 @@ function StepTwo({
   t
 }: {
   adminKey: string;
-  bothParticipants: Participant[];
   defaultMonth: string;
-  existingOverrides: { participantId: string; forceMode: string }[];
   matches: MatchWithPeople[];
   participants: Participant[];
   planningSettings: PlanningSettingsView;
@@ -672,18 +622,16 @@ function StepTwo({
           </select>
           <span className="field-hint">{t("step2HorizonHint")}</span>
         </label>
+        <div className="planning-form-extra">
+          <label className="check-row">
+            <input name="bothDoubleRole" type="checkbox" value="1" />
+            Beide rollen: &lsquo;allebei&rsquo;-deelnemers eten én koken deze ronde
+          </label>
+        </div>
         <button disabled={usingDemoData} type="submit">{t("step2GenerateBtn")}</button>
       </form>
 
       <p className="step-help">{t("step2Help")}</p>
-
-      <RoleOverrideSection
-        adminKey={adminKey}
-        bothParticipants={bothParticipants}
-        defaultMonth={defaultMonth}
-        existingOverrides={existingOverrides}
-        usingDemoData={usingDemoData}
-      />
 
       <div className="nested-panel">
         <div className="section-header">
@@ -1000,18 +948,6 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const planningEnd = addMonths(planningStart, planningSettings.horizonMonths);
   const planningRounds = rounds.filter((round) => round.month >= planningStart && round.month < planningEnd);
 
-  const bothParticipants = participants.filter((p) => p.active && p.mode === "BOTH");
-  let existingOverrides: { participantId: string; forceMode: string }[] = [];
-  if (!usingDemoData && bothParticipants.length > 0) {
-    try {
-      existingOverrides = await prisma.roundRoleOverride.findMany({
-        where: { month: planningStart, organizationId },
-        select: { participantId: true, forceMode: true }
-      });
-    } catch {
-      // ignore — overrides are optional
-    }
-  }
 
   return (
     <div className="page wide-page">
@@ -1041,7 +977,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
         <StepOne adminKey={key} participants={participants} showSheet={showSheet} signupUrl={signupUrl} usingDemoData={usingDemoData} t={t} />
       ) : null}
       {currentStep === "planning" ? (
-        <StepTwo adminKey={key} bothParticipants={bothParticipants} defaultMonth={defaultMonth} existingOverrides={existingOverrides} matches={matches} participants={participants} planningSettings={planningSettings} rounds={planningRounds} showSheet={showSheet} usingDemoData={usingDemoData} t={t} />
+        <StepTwo adminKey={key} defaultMonth={defaultMonth} matches={matches} participants={participants} planningSettings={planningSettings} rounds={planningRounds} showSheet={showSheet} usingDemoData={usingDemoData} t={t} />
       ) : null}
       {currentStep === "mails" ? (
         <StepFour adminKey={key} emailLogs={emailLogs} mailTemplates={mailTemplates} usingDemoData={usingDemoData} t={t} tm={tm} />

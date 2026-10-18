@@ -836,6 +836,11 @@ th {
   min-height: 44px;
 }
 
+.planning-form-extra {
+  align-self: end;
+  padding-bottom: 6px;
+}
+
 .role-override-list {
   display: grid;
   gap: 6px;
