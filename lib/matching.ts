@@ -400,7 +400,6 @@ export async function generateRoundForMonth(
       const existingAtBucket = assignments.filter((a) => a.hostId === bucket.host.id);
       const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
       if (existingAtBucket.length >= 2) return false;
-      if (bothDoubleRole && bucket.host.mode === ParticipationMode.BOTH && existingAtBucket.length >= 1) return false;
       if (bucketHasFamily || (request.partySize > 1 && existingAtBucket.length > 0)) return false;
       if (singlesAlone && existingAtBucket.length > 0) return false;
       return (
@@ -460,7 +459,9 @@ export async function generateRoundForMonth(
     const candidates = hostBuckets.filter((b) => {
       const key = pairKey(b.host.id, req.eater.id);
       const existingAtBucket = assignments.filter((a) => a.hostId === b.host.id);
-      if (existingAtBucket.length >= 2) return false; // hard max-2 limit always applies
+      if (existingAtBucket.length >= 2) return false;
+      const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
+      if (bucketHasFamily || (req.partySize > 1 && existingAtBucket.length > 0)) return false;
       return (
         b.host.id !== req.eater.id &&
         b.remainingCapacity >= req.partySize &&
@@ -520,7 +521,6 @@ export async function generateRoundForMonth(
           const existingAtBucket = assignments.filter((a) => a.hostId === h.id);
           const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
           if (existingAtBucket.length >= 2) return false;
-          if (bothDoubleRole && existingAtBucket.length >= 1) return false;
           if (bucketHasFamily || (pSize > 1 && existingAtBucket.length > 0)) return false;
           if (singlesAlone && existingAtBucket.length > 0) return false;
           if (!compatibleMatch(h, person)) return false;
@@ -561,7 +561,6 @@ export async function generateRoundForMonth(
               const existingAtBucket = assignments.filter((a) => a.hostId === b.host.id);
               const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
               if (existingAtBucket.length >= 2) return false;
-              if (bothDoubleRole && b.host.mode === ParticipationMode.BOTH && existingAtBucket.length >= 1) return false;
               if (bucketHasFamily || (pSize > 1 && existingAtBucket.length > 0)) return false;
               if (singlesAlone && existingAtBucket.length > 0) return false;
               return (

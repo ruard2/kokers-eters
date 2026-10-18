@@ -379,6 +379,14 @@ export async function sendSimpleHost(match: MatchWithPeople) {
     ? `Zij kunnen niet op: ${match.eater.cannotEatDays.trim()}`
     : "";
 
+  const siblingMatches = await prisma.mealMatch.findMany({
+    where: { roundId: match.roundId, hostId: match.hostId, id: { not: match.id } },
+    include: { eater: true }
+  });
+  const combinedNote = siblingMatches.length > 0
+    ? `Er zijn twee personen aan jou gekoppeld: ook ${siblingMatches.map((m) => m.eater.name).join(" en ")}. Ons voorstel: nodig ze samen tegelijk uit — maar apart kan ook.`
+    : "";
+
   const rendered = await renderMailTemplate("SIMPLE_HOST", {
     hostName: match.host.name,
     eaterName: match.eater.name,
@@ -387,7 +395,8 @@ export async function sendSimpleHost(match: MatchWithPeople) {
     allergies: fallbackText(match.eater.allergies),
     month: displayMonth(match.round.month),
     partySize: match.partySize,
-    cannotEatDaysText
+    cannotEatDaysText,
+    combinedNote
   }, match.host.organizationId);
 
   if (!rendered.enabled) {
