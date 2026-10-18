@@ -456,6 +456,11 @@ export async function generateRoundForMonth(
   for (const req of remainingEatRequests) {
     const candidates = hostBuckets.filter((b) => {
       const key = pairKey(b.host.id, req.eater.id);
+      const existingAtBucket = assignments.filter((a) => a.hostId === b.host.id);
+      const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
+      if (existingAtBucket.length >= 2) return false;
+      if (bucketHasFamily || (req.partySize > 1 && existingAtBucket.length > 0)) return false;
+      if (singlesAlone && existingAtBucket.length > 0) return false;
       return (
         b.host.id !== req.eater.id &&
         b.remainingCapacity >= req.partySize &&
