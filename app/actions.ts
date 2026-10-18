@@ -537,6 +537,34 @@ export async function deleteRoundAction(formData: FormData) {
   }
 }
 
+export async function saveRoleOverrideAction(formData: FormData) {
+  const admin = requireAdmin(formData);
+  const key = admin.key;
+  const participantId = text(formData, "participantId");
+  const monthStr = text(formData, "month");
+  const month = parseMonthInput(monthStr);
+  const forceMode = text(formData, "forceMode") as ParticipationMode;
+
+  try {
+    if (forceMode === ParticipationMode.BOTH) {
+      // BOTH = no override → delete any existing override
+      await prisma.roundRoleOverride.deleteMany({
+        where: { participantId, month, organizationId: admin.organizationId }
+      });
+    } else {
+      await prisma.roundRoleOverride.upsert({
+        where: { participantId_month: { participantId, month } },
+        create: { participantId, month, forceMode, organizationId: admin.organizationId },
+        update: { forceMode }
+      });
+    }
+    redirectAdmin(key, "", { step: "planning" });
+  } catch (error) {
+    if (isRedirectError(error)) throw error;
+    throw error;
+  }
+}
+
 export async function sendPreferenceChecksAction(formData: FormData) {
   const admin = requireAdmin(formData);
   const key = admin.key;

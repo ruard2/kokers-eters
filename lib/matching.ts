@@ -242,6 +242,13 @@ export async function generateRoundForMonth(
   });
   const optedOut = new Set(optOuts.map((item) => item.participantId));
 
+  // Role overrides: BOTH-mode participants forced to HOST-only or EAT-only this round
+  const roleOverrides = await prisma.roundRoleOverride.findMany({
+    where: { month, organizationId },
+    select: { participantId: true, forceMode: true }
+  });
+  const forcedMode = new Map(roleOverrides.map((o) => [o.participantId, o.forceMode]));
+
   const participants = await prisma.participant.findMany({
     where: {
       organizationId,
@@ -290,7 +297,8 @@ export async function generateRoundForMonth(
 
   const hostBuckets: HostBucket[] = [];
   for (const participant of participants) {
-    if (!canHost(participant.mode) || !participant.hostCapacity || participant.hostCapacity < 1) {
+    const effective = forcedMode.get(participant.id) ?? participant.mode;
+    if (!canHost(effective) || !participant.hostCapacity || participant.hostCapacity < 1) {
       continue;
     }
 
@@ -309,9 +317,11 @@ export async function generateRoundForMonth(
   // Only EAT-mode participants generate mandatory eater requests. BOTH-mode
   // participants are handled separately in Phase 2 so we never create more
   // assignments than strictly needed for full participation.
+  // Exception: BOTH participants forced to EAT-only this round via role override.
   const eatOnlyRequests: EaterRequest[] = [];
   for (const participant of participants) {
-    if (participant.mode !== ParticipationMode.EAT) continue;
+    const effective = forcedMode.get(participant.id) ?? participant.mode;
+    if (effective !== ParticipationMode.EAT) continue;
     const count = desiredCount(participant.eaterFrequency, participant.createdAt, month);
     for (let index = 0; index < count; index += 1) {
       eatOnlyRequests.push({
@@ -459,6 +469,9 @@ export async function generateRoundForMonth(
 
   const bothActive = participants.filter((p) => {
     if (p.mode !== ParticipationMode.BOTH) return false;
+    // Skip if forced to a single role — they're handled in Phase 1 (EAT) or just as host (HOST)
+    const forced = forcedMode.get(p.id);
+    if (forced === ParticipationMode.EAT || forced === ParticipationMode.HOST) return false;
     const eatCount = desiredCount(p.eaterFrequency, p.createdAt, month);
     const hostCount = desiredCount(p.hostFrequency, p.createdAt, month);
     return eatCount > 0 || hostCount > 0;

@@ -836,6 +836,23 @@ th {
   min-height: 44px;
 }
 
+.role-override-list {
+  display: grid;
+  gap: 6px;
+}
+
+.role-override-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr auto auto;
+  padding: 6px 0;
+}
+
+.role-override-name {
+  font-weight: 500;
+}
+
 .step-notes {
   display: grid;
   gap: 10px;

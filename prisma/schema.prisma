@@ -101,9 +101,10 @@ model Participant {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
-  hostedMatches MealMatch[]  @relation("HostMatches")
-  eatenMatches  MealMatch[]  @relation("EaterMatches")
+  hostedMatches MealMatch[]        @relation("HostMatches")
+  eatenMatches  MealMatch[]        @relation("EaterMatches")
   optOuts       RoundOptOut[]
+  roleOverrides RoundRoleOverride[]
   emailLogs     EmailLog[]
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -198,6 +199,21 @@ model RoundOptOut {
   createdAt     DateTime    @default(now())
 
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, month])
+  @@index([month])
+}
+
+model RoundRoleOverride {
+  id            String            @id @default(cuid())
+  participantId String
+  month         DateTime
+  forceMode     ParticipationMode
+  organizationId String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  participant  Participant   @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
   @@unique([participantId, month])
   @@index([month])
