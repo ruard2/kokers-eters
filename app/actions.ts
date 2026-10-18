@@ -825,3 +825,70 @@ export async function deleteParticipantAction(formData: FormData) {
     throw error;
   }
 }
+
+// Handmatig iemand die niet geplaatst is aan een koker koppelen (als eter).
+export async function addManualMatchAction(formData: FormData) {
+  const admin = requireAdmin(formData);
+  const key = admin.key;
+  const roundId = text(formData, "roundId");
+  const eaterId = text(formData, "eaterId");
+  const hostId = text(formData, "hostId");
+  const back = { step: "planning" };
+
+  if (!roundId || !eaterId || !hostId) {
+    redirectAdmin(key, "Kies eerst een koker.", back);
+  }
+
+  try {
+    const round = await prisma.matchRound.findFirst({
+      where: { id: roundId, organizationId: admin.organizationId },
+      include: { matches: { where: { status: { not: MatchStatus.CANCELLED } } } }
+    });
+    if (!round) {
+      redirectAdmin(key, "Ronde niet gevonden.", back);
+    }
+    if (round.status !== RoundStatus.DRAFT) {
+      redirectAdmin(key, "Deze ronde is al verstuurd. Zet hem eerst terug naar concept.", back);
+    }
+
+    const [host, eater] = await Promise.all([
+      prisma.participant.findFirst({ where: { id: hostId, organizationId: admin.organizationId } }),
+      prisma.participant.findFirst({ where: { id: eaterId, organizationId: admin.organizationId } })
+    ]);
+    if (!host || !eater) {
+      redirectAdmin(key, "Deelnemer niet gevonden.", back);
+    }
+    if (host.id === eater.id) {
+      redirectAdmin(key, "Iemand kan niet bij zichzelf eten.", back);
+    }
+    if (round.matches.some((m) => m.hostId === host.id && m.eaterId === eater.id)) {
+      redirectAdmin(key, `${eater.name} eet deze ronde al bij ${host.name}.`, back);
+    }
+
+    const partySize = Math.max(1, eater.comingWithCount);
+    await prisma.mealMatch.create({
+      data: {
+        roundId: round.id,
+        hostId: host.id,
+        eaterId: eater.id,
+        partySize,
+        hostToken: createToken(),
+        eaterToken: createToken()
+      }
+    });
+
+    const load = round.matches.filter((m) => m.hostId === host.id).reduce((sum, m) => sum + m.partySize, 0) + partySize;
+    const capacity = host.hostCapacity ?? 0;
+    redirectAdmin(
+      key,
+      `${eater.name} gekoppeld aan ${host.name}.${load > capacity ? ` Let op: ${host.name} krijgt nu ${load} personen bij capaciteit ${capacity}.` : ""}`,
+      back
+    );
+  } catch (error) {
+    if (isRedirectError(error)) throw error;
+    if (databaseUnavailableNotice(error)) {
+      redirectAdmin(key, "Database niet bereikbaar.", back);
+    }
+    throw error;
+  }
+}

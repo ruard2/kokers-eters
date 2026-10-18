@@ -453,34 +453,78 @@ export async function generateRoundForMonth(
     if (remainingEatRequests.length === 0) break;
   }
 
-  // Rescue: last-resort fallback for unplaced eaters.
-  // Combining rules are relaxed here so nobody silently drops out:
-  // - hard limit: max 2 parties per address
-  // - a single may join an address with a couple/family (and vice versa)
-  // - two couples/families are never combined
-  for (const req of remainingEatRequests) {
-    const candidates = hostBuckets.filter((b) => {
-      const key = pairKey(b.host.id, req.eater.id);
-      const existingAtBucket = assignments.filter((a) => a.hostId === b.host.id);
-      if (existingAtBucket.length >= 2) return false;
-      const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
-      if (req.partySize > 1 && bucketHasFamily) return false;
-      return (
-        b.host.id !== req.eater.id &&
-        b.remainingCapacity >= req.partySize &&
-        compatibleMatch(b.host, req.eater) &&
-        !adminBlocksMatch(b.host, req.eater, adminNoMatch) &&
-        !currentPairs.has(key)
+  // ── Last resort ─────────────────────────────────────────────────────────────
+  // Rule: everyone who wants to take part is placed at least once.
+  // We relax the house rules one step at a time and stop at the first step
+  // that finds an address. Admin "never match" blocks are never relaxed.
+  //   1. max 2 parties per address, never two couples/families together
+  //   2. max 2 parties per address, two couples/families allowed (room permitting)
+  //   3. any number of parties, as long as the address has room
+  //   4. address is full, pick the one with the fewest guests
+  //   5. as 4, also ignoring meal vs coffee preference
+  //   6. as 5, also using hosts who were not scheduled to host this month
+  // `minimumOnly` limits a person who is already placed once (e.g. a second
+  // biweekly request) to steps 1-2, so we never overfill for an extra visit.
+  const offRotaBuckets: HostBucket[] = participants
+    .filter((p) => {
+      const effective = forcedMode.get(p.id) ?? p.mode;
+      return canHost(effective) && (p.hostCapacity ?? 0) >= 1 && !hostBuckets.some((b) => b.host.id === p.id);
+    })
+    .map((p) => ({ host: p, remainingCapacity: p.hostCapacity ?? 0, hostedCount: hostHistory.get(p.id) || 0, slotIndex: 0 }));
+
+  function partiesAt(hostId: string) {
+    return assignments.filter((a) => a.hostId === hostId);
+  }
+
+  function placeLastResort(person: Participant, partySize: number, minimumOnly: boolean): boolean {
+    const base = (b: HostBucket) =>
+      b.host.id !== person.id &&
+      !adminBlocksMatch(b.host, person, adminNoMatch) &&
+      !currentPairs.has(pairKey(b.host.id, person.id));
+
+    const steps: Array<{ pool: HostBucket[]; ok: (b: HostBucket) => boolean }> = [
+      {
+        pool: hostBuckets,
+        ok: (b) => {
+          const here = partiesAt(b.host.id);
+          if (here.length >= 2) return false;
+          if (partySize > 1 && here.some((a) => a.partySize > 1)) return false;
+          return b.remainingCapacity >= partySize && compatibleMatch(b.host, person);
+        }
+      },
+      {
+        pool: hostBuckets,
+        ok: (b) => partiesAt(b.host.id).length < 2 && b.remainingCapacity >= partySize && compatibleMatch(b.host, person)
+      }
+    ];
+    if (!minimumOnly) {
+      steps.push(
+        { pool: hostBuckets, ok: (b) => b.remainingCapacity >= partySize && compatibleMatch(b.host, person) },
+        { pool: hostBuckets, ok: (b) => compatibleMatch(b.host, person) },
+        { pool: hostBuckets, ok: () => true },
+        { pool: offRotaBuckets, ok: () => true }
       );
-    });
-    if (candidates.length === 0) continue;
-    const assignedIds = new Set(assignments.map((a) => a.hostId));
-    const selected = shuffle(candidates).sort((a, b) => {
-      const aBonus = !assignedIds.has(a.host.id) ? -40 : 0;
-      const bBonus = !assignedIds.has(b.host.id) ? -40 : 0;
-      return (a.hostedCount * 20 + aBonus) - (b.hostedCount * 20 + bBonus);
-    })[0];
-    makeAssignment(selected, req.eater, req.partySize);
+    }
+
+    for (const step of steps) {
+      const candidates = step.pool.filter((b) => base(b) && step.ok(b));
+      if (candidates.length === 0) continue;
+      // Fewest parties first, then most room left, then least hosted historically
+      const selected = shuffle(candidates).sort(
+        (a, b) =>
+          partiesAt(a.host.id).length - partiesAt(b.host.id).length ||
+          b.remainingCapacity - a.remainingCapacity ||
+          a.hostedCount - b.hostedCount
+      )[0];
+      makeAssignment(selected, person, partySize);
+      return true;
+    }
+    return false;
+  }
+
+  for (const req of remainingEatRequests) {
+    const alreadyEats = assignments.some((a) => a.eaterId === req.eater.id);
+    placeLastResort(req.eater, req.partySize, alreadyEats);
   }
 
   // ── Phase 2: BOTH-mode coverage ──────────────────────────────────────────────
@@ -589,26 +633,10 @@ export async function generateRoundForMonth(
       if (uncoveredBoth.every((p) => covered.has(p.id))) break;
     }
 
-    // Pass C: last resort for BOTH people — same relaxed rules as the Phase 1 rescue.
+    // Pass C: last resort for BOTH people — everyone is placed at least once.
     for (const person of uncoveredBoth) {
       if (covered.has(person.id)) continue;
-      const pSize = Math.max(1, person.comingWithCount ?? 1);
-      const candidates = shuffle(
-        hostBuckets.filter((b) => {
-          const existingAtBucket = assignments.filter((a) => a.hostId === b.host.id);
-          if (existingAtBucket.length >= 2) return false;
-          if (pSize > 1 && existingAtBucket.some((a) => a.partySize > 1)) return false;
-          return (
-            b.host.id !== person.id &&
-            b.remainingCapacity >= pSize &&
-            compatibleMatch(b.host, person) &&
-            !adminBlocksMatch(b.host, person, adminNoMatch) &&
-            !currentPairs.has(pairKey(b.host.id, person.id))
-          );
-        })
-      ).sort((a, b) => a.remainingCapacity - b.remainingCapacity);
-      if (candidates.length > 0) {
-        makeAssignment(candidates[0], person, pSize);
+      if (placeLastResort(person, Math.max(1, person.comingWithCount ?? 1), false)) {
         covered.add(person.id);
       }
     }

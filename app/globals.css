@@ -1879,12 +1879,29 @@ th {
 }
 
 .unplaced-panel li {
+  border-top: 1px solid #ead38c;
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.unplaced-who {
   align-items: baseline;
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;
 }
 
-.unplaced-panel li small {
+.unplaced-who small {
   color: var(--muted);
+}
+
+.unplaced-form {
+  display: flex;
+  gap: 8px;
+}
+
+.unplaced-form select {
+  flex: 1;
+  min-width: 0;
 }

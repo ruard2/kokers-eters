@@ -2,6 +2,7 @@ import type { EmailLog, MailTemplate, MatchRound, MealMatch, Participant, Planni
 import type { ReactNode } from "react";
 import { getTranslations, getLocale } from "next-intl/server";
 import {
+  addManualMatchAction,
   cancelMatchAction,
   clearDemoAction,
   deleteParticipantAction,
@@ -497,7 +498,15 @@ function RoundsAccordion({
                   />
                 </div>
               ) : null}
-              {unplaced.length > 0 ? <UnplacedList unplaced={unplaced} /> : null}
+              {unplaced.length > 0 ? (
+                <UnplacedList
+                  adminKey={adminKey}
+                  disabled={usingDemoData || round.status !== "DRAFT"}
+                  hosts={hostOptions(participants, roundMatches)}
+                  roundId={round.id}
+                  unplaced={unplaced}
+                />
+              ) : null}
             </div>
           </details>
         );
@@ -510,22 +519,67 @@ function partyLabel(size: number) {
   return size > 1 ? `${size} personen` : "single";
 }
 
-function UnplacedList({ unplaced }: { unplaced: UnplacedParticipant[] }) {
+type HostOption = { id: string; name: string; capacity: number; load: number };
+
+// Everyone who can cook, with how many people they already have in this round.
+function hostOptions(participants: Participant[], roundMatches: MatchWithPeople[]): HostOption[] {
+  return participants
+    .filter((p) => p.active && p.mode !== "EAT" && (p.hostCapacity ?? 0) >= 1)
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      capacity: p.hostCapacity ?? 0,
+      load: roundMatches.filter((m) => m.hostId === p.id && m.status !== "CANCELLED").reduce((sum, m) => sum + m.partySize, 0)
+    }))
+    .sort((a, b) => (b.capacity - b.load) - (a.capacity - a.load) || a.name.localeCompare(b.name, "nl"));
+}
+
+function UnplacedList({
+  adminKey,
+  disabled,
+  hosts,
+  roundId,
+  unplaced
+}: {
+  adminKey: string;
+  disabled: boolean;
+  hosts: HostOption[];
+  roundId: string;
+  unplaced: UnplacedParticipant[];
+}) {
   return (
     <div className="unplaced-panel">
       <strong>Niet geplaatst ({unplaced.length})</strong>
       <p className="compact-muted">
-        Deze deelnemers zitten niet (of te weinig) in deze ronde. Er was geen passend adres meer vrij. Koppel ze hierboven handmatig of genereer opnieuw.
+        Deze deelnemers zitten niet (of te weinig) in deze ronde. Kies een koker en klik op Koppel. Kokers met de meeste ruimte staan bovenaan.
       </p>
       <ul>
         {unplaced.map(({ participant, needed, got }) => (
           <li key={participant.id}>
-            <span>{participant.name}</span>
-            <small>
-              {partyLabel(Math.max(1, participant.comingWithCount))}
-              {participant.mode === "BOTH" ? " - allebei" : ""}
-              {needed > 1 ? ` - ${got} van ${needed} keer geplaatst` : ""}
-            </small>
+            <div className="unplaced-who">
+              <span>{participant.name}</span>
+              <small>
+                {partyLabel(Math.max(1, participant.comingWithCount))}
+                {participant.mode === "BOTH" ? " - allebei" : ""}
+                {needed > 1 ? ` - ${got} van ${needed} keer geplaatst` : ""}
+              </small>
+            </div>
+            <form action={addManualMatchAction} className="unplaced-form">
+              <input type="hidden" name="adminKey" value={adminKey} />
+              <input type="hidden" name="roundId" value={roundId} />
+              <input type="hidden" name="eaterId" value={participant.id} />
+              <select aria-label={`Koker voor ${participant.name}`} defaultValue="" disabled={disabled} name="hostId" required>
+                <option disabled value="">Kies koker…</option>
+                {hosts
+                  .filter((host) => host.id !== participant.id)
+                  .map((host) => (
+                    <option key={host.id} value={host.id}>
+                      {host.name} ({host.load}/{host.capacity})
+                    </option>
+                  ))}
+              </select>
+              <button className="small" disabled={disabled} type="submit">Koppel</button>
+            </form>
           </li>
         ))}
       </ul>
