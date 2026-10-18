@@ -396,9 +396,11 @@ export async function generateRoundForMonth(
       const conn = connectionKey(bucket.host.id, request.eater.id);
       // Sharing rules: couples/families always get an exclusive host.
       // Singles can share with one other single unless singlesAlone is set.
+      // When bothDoubleRole: BOTH-mode hosts also eat, so cap them at 1 hosting match.
       const existingAtBucket = assignments.filter((a) => a.hostId === bucket.host.id);
       const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
       if (existingAtBucket.length >= 2) return false;
+      if (bothDoubleRole && bucket.host.mode === ParticipationMode.BOTH && existingAtBucket.length >= 1) return false;
       if (bucketHasFamily || (request.partySize > 1 && existingAtBucket.length > 0)) return false;
       if (singlesAlone && existingAtBucket.length > 0) return false;
       return (
@@ -452,15 +454,13 @@ export async function generateRoundForMonth(
     if (remainingEatRequests.length === 0) break;
   }
 
-  // Rescue: EAT-only stragglers (allow prior connections + drop duplicate-connection check)
+  // Rescue: last-resort fallback for unplaced eaters.
+  // Combining rules are relaxed here — the only hard limit is max 2 eaters per address.
   for (const req of remainingEatRequests) {
     const candidates = hostBuckets.filter((b) => {
       const key = pairKey(b.host.id, req.eater.id);
       const existingAtBucket = assignments.filter((a) => a.hostId === b.host.id);
-      const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
-      if (existingAtBucket.length >= 2) return false;
-      if (bucketHasFamily || (req.partySize > 1 && existingAtBucket.length > 0)) return false;
-      if (singlesAlone && existingAtBucket.length > 0) return false;
+      if (existingAtBucket.length >= 2) return false; // hard max-2 limit always applies
       return (
         b.host.id !== req.eater.id &&
         b.remainingCapacity >= req.partySize &&
@@ -516,10 +516,11 @@ export async function generateRoundForMonth(
             (b) => b.host.id === h.id && b.remainingCapacity >= pSize
           );
           if (!bucket) return false;
-          // Same sharing rules as Phase 1
+          // Same sharing rules as Phase 1 (h is always BOTH-mode here)
           const existingAtBucket = assignments.filter((a) => a.hostId === h.id);
           const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
           if (existingAtBucket.length >= 2) return false;
+          if (bothDoubleRole && existingAtBucket.length >= 1) return false;
           if (bucketHasFamily || (pSize > 1 && existingAtBucket.length > 0)) return false;
           if (singlesAlone && existingAtBucket.length > 0) return false;
           if (!compatibleMatch(h, person)) return false;
@@ -560,6 +561,7 @@ export async function generateRoundForMonth(
               const existingAtBucket = assignments.filter((a) => a.hostId === b.host.id);
               const bucketHasFamily = existingAtBucket.some((a) => a.partySize > 1);
               if (existingAtBucket.length >= 2) return false;
+              if (bothDoubleRole && b.host.mode === ParticipationMode.BOTH && existingAtBucket.length >= 1) return false;
               if (bucketHasFamily || (pSize > 1 && existingAtBucket.length > 0)) return false;
               if (singlesAlone && existingAtBucket.length > 0) return false;
               return (
