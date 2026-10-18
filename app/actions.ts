@@ -410,14 +410,17 @@ export async function sendHostInvitesAction(formData: FormData) {
   const key = admin.key;
   const roundId = text(formData, "roundId") || undefined;
   try {
-    const sent = await sendHostInvitesForRound(roundId, admin.organizationId);
-    redirectAdmin(
-      key,
-      sent > 0
-        ? `${sent} host-mails verstuurd.`
-        : "Geen host-mails verstuurd. Controleer of de mailprovider is ingesteld en of de host-mail aan staat.",
-      { step: "mails" }
-    );
+    const report = await sendHostInvitesForRound(roundId, admin.organizationId);
+    const parts = [`${report.hostMails} kokermail(s) en ${report.eaterMails} etermail(s) verstuurd.`];
+    if (report.disabled.length > 0) {
+      parts.push(`Let op: de ${report.disabled.join(" en ")}mail staat uit in stap 3, die is niet verstuurd.`);
+    }
+    if (report.failures.length > 0) {
+      parts.push(
+        `${report.failures.length} mail(s) mislukt; die koppelingen blijven op concept, druk opnieuw op goedkeuren om het nog eens te proberen. Eerste fout: ${report.failures[0]}`
+      );
+    }
+    redirectAdmin(key, parts.join(" "), { step: "mails" });
   } catch (error) {
     if (isRedirectError(error)) throw error;
     if (databaseUnavailableNotice(error)) {

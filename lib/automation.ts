@@ -43,10 +43,23 @@ function mailHandled(result: { status: string }) {
   return result.status === "sent" || result.status === "skipped_existing" || result.status === "skipped_disabled";
 }
 
+export type MatchMailReport = {
+  matchesDone: number;
+  hostMails: number;
+  eaterMails: number;
+  disabled: string[];
+  failures: string[];
+};
+
+function errorText(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function sendHostInvitesForRound(
   roundId?: string,
   organizationId: string | null = null
-) {
+): Promise<MatchMailReport> {
+  const report: MatchMailReport = { matchesDone: 0, hostMails: 0, eaterMails: 0, disabled: [], failures: [] };
   const matches = await prisma.mealMatch.findMany({
     where: {
       roundId,
@@ -73,12 +86,15 @@ export async function sendHostInvitesForRound(
       result = await sendMatchHostMail(group[0].host, group[0].round, group);
     } catch (error) {
       console.error(`[mail error] koppelingsmail koker ${key}:`, error);
+      report.failures.push(`koker ${group[0].host.name} (${group[0].host.email}): ${errorText(error)}`);
     }
+    if (result.status === "sent") report.hostMails += 1;
+    if (result.status === "skipped_disabled" && !report.disabled.includes("koker")) report.disabled.push("koker");
+    if (result.status === "skipped_no_provider") report.failures.push(`koker ${group[0].host.name}: geen mailprovider ingesteld`);
     hostOk.set(key, mailHandled(result));
   }
 
   // One mail per eater per koppeling.
-  let sent = 0;
   const touchedRounds = new Set<string>();
   for (const match of matches) {
     let result: { status: string } = { status: "error" };
@@ -86,7 +102,11 @@ export async function sendHostInvitesForRound(
       result = await sendMatchEaterMail(match);
     } catch (error) {
       console.error(`[mail error] koppelingsmail eter ${match.id}:`, error);
+      report.failures.push(`eter ${match.eater.name} (${match.eater.email}): ${errorText(error)}`);
     }
+    if (result.status === "sent") report.eaterMails += 1;
+    if (result.status === "skipped_disabled" && !report.disabled.includes("eter")) report.disabled.push("eter");
+    if (result.status === "skipped_no_provider") report.failures.push(`eter ${match.eater.name}: geen mailprovider ingesteld`);
 
     if (!mailHandled(result) || !hostOk.get(`${match.roundId}:${match.hostId}`)) {
       continue;
@@ -100,7 +120,7 @@ export async function sendHostInvitesForRound(
       }
     });
     touchedRounds.add(match.roundId);
-    sent += 1;
+    report.matchesDone += 1;
   }
 
   // A round is "sent" once none of its matches is still waiting in DRAFT.
@@ -114,7 +134,7 @@ export async function sendHostInvitesForRound(
     }
   }
 
-  return sent;
+  return report;
 }
 
 export async function sendFallbacksForStaleMatches() {
@@ -149,10 +169,10 @@ export async function runDueJobs(
     }
 
     if (process.env.AUTO_SEND_ROUNDS === "true") {
-      hostInvites = await sendHostInvitesForRound(
+      hostInvites = (await sendHostInvitesForRound(
         existing?.id || generatedRound?.roundId,
         organizationId
-      );
+      )).matchesDone;
     }
   }
 

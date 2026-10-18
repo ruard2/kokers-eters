@@ -597,6 +597,7 @@ function EmailLogsTable({ emailLogs, t }: { emailLogs: EmailLog[]; t: T }) {
             <th>{t("logsColEmail")}</th>
             <th>{t("logsColStatus")}</th>
             <th>{t("logsColSubject")}</th>
+            <th>Fout</th>
           </tr>
         </thead>
         <tbody>
@@ -606,11 +607,12 @@ function EmailLogsTable({ emailLogs, t }: { emailLogs: EmailLog[]; t: T }) {
               <td>{log.toEmail}</td>
               <td>{log.status}</td>
               <td>{log.subject}</td>
+              <td>{log.error || ""}</td>
             </tr>
           ))}
           {emailLogs.length === 0 ? (
             <tr>
-              <td colSpan={4}>{t("noMails")}</td>
+              <td colSpan={5}>{t("noMails")}</td>
             </tr>
           ) : null}
         </tbody>
@@ -1018,7 +1020,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
           ? { OR: [{ participant: { organizationId } }, { match: { round: { organizationId } } }] }
           : { OR: [{ participant: { organizationId: null } }, { match: { round: { organizationId: null } } }] },
         orderBy: { createdAt: "desc" },
-        take: 30
+        take: 150
       }),
       prisma.planningSettings.findFirst({ where: { organizationId } }),
       prisma.mailTemplate.findMany({ where: { organizationId }, orderBy: { type: "asc" } }),
