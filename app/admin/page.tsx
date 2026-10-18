@@ -627,6 +627,10 @@ function StepTwo({
             <input name="bothDoubleRole" type="checkbox" value="1" />
             Beide rollen: &lsquo;allebei&rsquo;-deelnemers eten én koken deze ronde
           </label>
+          <label className="check-row">
+            <input name="singlesAlone" type="checkbox" value="1" />
+            Elke single op een eigen adres (niet samenvoegen)
+          </label>
         </div>
         <button disabled={usingDemoData} type="submit">{t("step2GenerateBtn")}</button>
       </form>
